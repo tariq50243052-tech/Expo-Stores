@@ -106,19 +106,19 @@ const Portal = () => {
       
       {/* Navbar */}
       <header className="bg-white/80 backdrop-blur-md border-b border-slate-200 sticky top-0 z-50 transition-all duration-300">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 h-20 flex items-center justify-between">
-          <div className="flex items-center gap-4">
-             <img src="/logo.svg" alt="Expo City Dubai" className="h-14 w-auto" />
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 h-16 md:h-20 flex items-center justify-between">
+          <div className="flex items-center gap-3 md:gap-4">
+             <img src="/logo.svg" alt="Expo City Dubai" className="h-10 md:h-14 w-auto" />
              <div>
-               <h1 className="text-xl font-bold tracking-tight text-slate-900 uppercase drop-shadow-sm">Expo City Dubai</h1>
+               <h1 className="text-lg md:text-xl font-bold tracking-tight text-slate-900 uppercase drop-shadow-sm leading-tight">Expo City Dubai</h1>
                <div className="flex items-center gap-2">
                  <div className="h-0.5 w-4 bg-amber-500 rounded-full"></div>
-                 <p className="text-[10px] text-slate-500 tracking-[0.2em] uppercase font-bold">Asset Management Portal</p>
+                 <p className="text-[8px] md:text-[10px] text-slate-500 tracking-[0.2em] uppercase font-bold">Asset Management Portal</p>
                </div>
              </div>
           </div>
           
-          <div className="flex items-center gap-6">
+          <div className="flex items-center gap-4 md:gap-6">
             <div className="text-right hidden sm:block">
               <div className="text-sm font-bold text-slate-800 tracking-wide">{user?.name}</div>
               <div className="flex items-center justify-end gap-1.5">
@@ -129,70 +129,70 @@ const Portal = () => {
             
             <div 
               onClick={() => setShowPasswordModal(true)}
-              className="w-10 h-10 rounded-full bg-slate-100 border border-slate-200 flex items-center justify-center text-slate-600 hover:bg-slate-200 hover:text-slate-900 transition-all cursor-pointer shadow-sm"
+              className="w-9 h-9 md:w-10 md:h-10 rounded-full bg-slate-100 border border-slate-200 flex items-center justify-center text-slate-600 hover:bg-slate-200 hover:text-slate-900 transition-all cursor-pointer shadow-sm"
               title="Change Password"
             >
-              <Lock size={18} />
+              <Lock size={16} className="md:w-[18px] md:h-[18px]" />
             </div>
 
-            <div className="w-10 h-10 rounded-full bg-slate-100 border border-slate-200 flex items-center justify-center text-slate-600 hover:bg-slate-200 hover:text-slate-900 transition-all cursor-pointer shadow-sm">
-              <ShieldCheck size={20} />
+            <div className="w-9 h-9 md:w-10 md:h-10 rounded-full bg-slate-100 border border-slate-200 flex items-center justify-center text-slate-600 hover:bg-slate-200 hover:text-slate-900 transition-all cursor-pointer shadow-sm">
+              <ShieldCheck size={18} className="md:w-[20px] md:h-[20px]" />
             </div>
           </div>
         </div>
       </header>
 
       {/* Main Content */}
-      <main className="flex-1 max-w-7xl mx-auto w-full px-4 sm:px-6 lg:px-8 py-12 relative z-10">
+      <main className="flex-1 max-w-7xl mx-auto w-full px-4 sm:px-6 lg:px-8 py-8 md:py-12 relative z-10">
         
         {/* Welcome Section */}
-        <div className="mb-10 text-center">
-          <h2 className="text-4xl font-bold text-slate-900 mb-3 tracking-tight">Welcome Back, {user?.name}</h2>
-          <p className="text-slate-500 text-lg max-w-2xl mx-auto">
+        <div className="mb-8 md:mb-10 text-center">
+          <h2 className="text-2xl md:text-4xl font-bold text-slate-900 mb-2 md:mb-3 tracking-tight">Welcome Back, {user?.name}</h2>
+          <p className="text-slate-500 text-sm md:text-lg max-w-2xl mx-auto px-4">
             Select a workspace to manage assets or use the admin tools below.
           </p>
         </div>
 
         {/* Stores Grid Section */}
-        <div className="mb-16">
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8">
+        <div className="mb-12 md:mb-16">
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 md:gap-8">
             {stores.map((store) => (
               <button
                 key={store._id}
                 onClick={() => handleSelectStore(store)}
-                className={`group relative bg-white border border-slate-200 rounded-2xl p-6 shadow-sm hover:shadow-xl hover:border-amber-500/30 transition-all duration-300 text-left flex flex-col justify-between h-56 overflow-hidden ${
+                className={`group relative bg-white border border-slate-200 rounded-2xl p-5 md:p-6 shadow-sm hover:shadow-xl hover:border-amber-500/30 transition-all duration-300 text-left flex flex-col justify-between h-auto min-h-[180px] md:h-56 overflow-hidden ${
                   activeStore?._id === store._id 
                     ? 'ring-2 ring-amber-500 shadow-amber-500/10' 
                     : ''
                 }`}
               >
-                <div className="absolute top-0 right-0 w-32 h-32 bg-gradient-to-br from-amber-500/10 to-transparent rounded-bl-full -mr-10 -mt-10 transition-transform group-hover:scale-110 opacity-50 group-hover:opacity-100"></div>
+                <div className="absolute top-0 right-0 w-24 h-24 md:w-32 md:h-32 bg-gradient-to-br from-amber-500/10 to-transparent rounded-bl-full -mr-8 -mt-8 md:-mr-10 md:-mt-10 transition-transform group-hover:scale-110 opacity-50 group-hover:opacity-100"></div>
                 
-                <div className="relative z-10">
-                  <div className="flex items-center justify-between mb-6">
-                    <div className="w-14 h-14 rounded-2xl bg-slate-50 border border-slate-100 flex items-center justify-center text-slate-700 group-hover:bg-amber-500 group-hover:text-white group-hover:border-amber-500 transition-all shadow-inner">
-                      <Building2 size={28} />
+                <div className="relative z-10 w-full">
+                  <div className="flex items-center justify-between mb-4 md:mb-6">
+                    <div className="w-12 h-12 md:w-14 md:h-14 rounded-xl md:rounded-2xl bg-slate-50 border border-slate-100 flex items-center justify-center text-slate-700 group-hover:bg-amber-500 group-hover:text-white group-hover:border-amber-500 transition-all shadow-inner">
+                      <Building2 size={24} className="md:w-[28px] md:h-[28px]" />
                     </div>
                     {activeStore?._id === store._id && (
-                      <span className="inline-flex items-center px-3 py-1 rounded-full text-xs font-bold bg-green-50 text-green-600 border border-green-200">
+                      <span className="inline-flex items-center px-2 py-0.5 md:px-3 md:py-1 rounded-full text-[10px] md:text-xs font-bold bg-green-50 text-green-600 border border-green-200">
                         ACTIVE
                       </span>
                     )}
                   </div>
                   
-                  <h4 className="text-2xl font-bold text-slate-900 mb-1 group-hover:text-amber-600 transition-colors tracking-wide">
+                  <h4 className="text-xl md:text-2xl font-bold text-slate-900 mb-1 group-hover:text-amber-600 transition-colors tracking-wide truncate">
                     {store.name}
                   </h4>
-                  <p className="text-sm text-slate-400 font-mono">ID: {store._id.substring(store._id.length - 6).toUpperCase()}</p>
+                  <p className="text-xs md:text-sm text-slate-400 font-mono">ID: {store._id.substring(store._id.length - 6).toUpperCase()}</p>
                 </div>
 
-                <div className="relative z-10 pt-4 border-t border-slate-100 mt-auto flex justify-between items-center">
-                  <span className="text-xs font-medium text-slate-400 uppercase tracking-widest flex items-center gap-2">
-                    <div className={`w-2 h-2 rounded-full ${store.isActive ? 'bg-green-500' : 'bg-green-500'}`}></div>
+                <div className="relative z-10 pt-4 border-t border-slate-100 mt-4 md:mt-auto flex justify-between items-center w-full">
+                  <span className="text-[10px] md:text-xs font-medium text-slate-400 uppercase tracking-widest flex items-center gap-2">
+                    <div className={`w-1.5 h-1.5 md:w-2 md:h-2 rounded-full ${store.isActive ? 'bg-green-500' : 'bg-green-500'}`}></div>
                     {store.openingTime} - {store.closingTime}
                   </span>
-                  <div className="flex items-center text-amber-500 text-sm font-bold opacity-0 group-hover:opacity-100 transition-all transform translate-x-4 group-hover:translate-x-0">
-                    ENTER <ChevronRight size={16} className="ml-1" />
+                  <div className="flex items-center text-amber-500 text-xs md:text-sm font-bold opacity-100 md:opacity-0 md:group-hover:opacity-100 transition-all transform translate-x-0 md:translate-x-4 md:group-hover:translate-x-0">
+                    ENTER <ChevronRight size={14} className="ml-1 md:w-[16px] md:h-[16px]" />
                   </div>
                 </div>
               </button>
@@ -202,48 +202,48 @@ const Portal = () => {
 
         {/* Quick Actions Grid - Admin Tools */}
         <div className="mb-8">
-           <h3 className="text-sm font-bold text-slate-400 uppercase tracking-widest mb-6 border-b border-slate-200 pb-2">
+           <h3 className="text-xs md:text-sm font-bold text-slate-400 uppercase tracking-widest mb-4 md:mb-6 border-b border-slate-200 pb-2">
              Admin Utilities
            </h3>
-           <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+           <div className="grid grid-cols-1 md:grid-cols-2 gap-4 md:gap-6">
              {/* Manage Members Card */}
              <div 
                onClick={() => setShowMembers(true)}
-               className="bg-white border border-slate-200 rounded-xl p-5 hover:bg-slate-50 hover:border-blue-500/30 cursor-pointer transition-all group flex items-center gap-5 shadow-sm"
+               className="bg-white border border-slate-200 rounded-xl p-4 md:p-5 hover:bg-slate-50 hover:border-blue-500/30 cursor-pointer transition-all group flex items-center gap-4 md:gap-5 shadow-sm"
              >
-               <div className="p-4 bg-blue-50 rounded-lg text-blue-600 group-hover:bg-blue-500 group-hover:text-white transition-colors border border-blue-100">
-                 <Users size={24} />
+               <div className="p-3 md:p-4 bg-blue-50 rounded-lg text-blue-600 group-hover:bg-blue-500 group-hover:text-white transition-colors border border-blue-100">
+                 <Users size={20} className="md:w-[24px] md:h-[24px]" />
                </div>
                <div>
-                 <h3 className="text-lg font-bold text-slate-900 mb-1 group-hover:text-blue-600 transition-colors">Manage Members</h3>
-                 <p className="text-slate-500 text-sm">Add/Remove Admins & Technicians</p>
+                 <h3 className="text-base md:text-lg font-bold text-slate-900 mb-0.5 md:mb-1 group-hover:text-blue-600 transition-colors">Manage Members</h3>
+                 <p className="text-slate-500 text-xs md:text-sm">Add/Remove Admins & Technicians</p>
                </div>
-               <ChevronRight size={20} className="ml-auto text-slate-400 group-hover:text-blue-500 group-hover:translate-x-1 transition-all" />
+               <ChevronRight size={18} className="ml-auto text-slate-400 group-hover:text-blue-500 group-hover:translate-x-1 transition-all md:w-[20px] md:h-[20px]" />
              </div>
 
              {/* System Maintenance Card */}
              <div 
                onClick={() => setShowResetModal(true)}
-               className="bg-white border border-slate-200 rounded-xl p-5 hover:bg-slate-50 hover:border-red-500/30 cursor-pointer transition-all group flex items-center gap-5 shadow-sm"
+               className="bg-white border border-slate-200 rounded-xl p-4 md:p-5 hover:bg-slate-50 hover:border-red-500/30 cursor-pointer transition-all group flex items-center gap-4 md:gap-5 shadow-sm"
              >
-               <div className="p-4 bg-red-50 rounded-lg text-red-600 group-hover:bg-red-500 group-hover:text-white transition-colors border border-red-100">
-                 <Database size={24} />
+               <div className="p-3 md:p-4 bg-red-50 rounded-lg text-red-600 group-hover:bg-red-500 group-hover:text-white transition-colors border border-red-100">
+                 <Database size={20} className="md:w-[24px] md:h-[24px]" />
                </div>
                <div>
-                 <h3 className="text-lg font-bold text-slate-900 mb-1 group-hover:text-red-600 transition-colors">System Reset</h3>
-                 <p className="text-slate-500 text-sm">Database Maintenance & Config</p>
+                 <h3 className="text-base md:text-lg font-bold text-slate-900 mb-0.5 md:mb-1 group-hover:text-red-600 transition-colors">System Reset</h3>
+                 <p className="text-slate-500 text-xs md:text-sm">Database Maintenance & Config</p>
                </div>
-               <Settings size={20} className="ml-auto text-slate-400 group-hover:text-red-500 group-hover:rotate-45 transition-all" />
+               <Settings size={18} className="ml-auto text-slate-400 group-hover:text-red-500 group-hover:rotate-45 transition-all md:w-[20px] md:h-[20px]" />
              </div>
           </div>
         </div>
       </main>
 
       {/* Footer */}
-      <footer className="bg-white/60 backdrop-blur-md border-t border-slate-200 py-6 mt-auto relative z-10 text-slate-500">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 flex flex-col md:flex-row justify-between items-center gap-4">
-           <p className="text-sm">© {new Date().getFullYear()} Expo City Dubai. All rights reserved.</p>
-           <div className="flex gap-6 text-sm opacity-80">
+      <footer className="bg-white/60 backdrop-blur-md border-t border-slate-200 py-4 md:py-6 mt-auto relative z-10 text-slate-500">
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 flex flex-col md:flex-row justify-between items-center gap-3 md:gap-4">
+           <p className="text-xs md:text-sm">© {new Date().getFullYear()} Expo City Dubai. All rights reserved.</p>
+           <div className="flex gap-4 md:gap-6 text-xs md:text-sm opacity-80">
              <span>v2.5.0 (Enterprise)</span>
              <span className="flex items-center gap-2"><div className="w-1.5 h-1.5 rounded-full bg-green-500"></div> System Status: Online</span>
            </div>
