@@ -1,0 +1,161 @@
+const express = require('express');
+const router = express.Router();
+const mongoose = require('mongoose');
+const fs = require('fs');
+const path = require('path');
+const { protect, admin, superAdmin } = require('../middleware/authMiddleware');
+const User = require('../models/User');
+const Asset = require('../models/Asset');
+const Store = require('../models/Store');
+const Request = require('../models/Request');
+const ActivityLog = require('../models/ActivityLog');
+const PurchaseOrder = require('../models/PurchaseOrder');
+const Vendor = require('../models/Vendor');
+const Pass = require('../models/Pass');
+const Permit = require('../models/Permit');
+const AssetCategory = require('../models/AssetCategory');
+const bcrypt = require('bcryptjs');
+
+// Helper to get directory size
+const getDirSize = (dirPath) => {
+  let size = 0;
+  if (fs.existsSync(dirPath)) {
+    const files = fs.readdirSync(dirPath);
+    files.forEach(file => {
+      const filePath = path.join(dirPath, file);
+      const stats = fs.statSync(filePath);
+      if (stats.isDirectory()) {
+        size += getDirSize(filePath);
+      } else {
+        size += stats.size;
+      }
+    });
+  }
+  return size;
+};
+
+// @desc    Get system storage stats
+// @route   GET /api/system/storage
+// @access  Private/Admin
+router.get('/storage', protect, admin, async (req, res) => {
+  try {
+    const dbStats = await mongoose.connection.db.stats();
+    const dbSize = dbStats.dataSize || 0;
+    
+    const uploadsPath = path.join(__dirname, '../uploads');
+    const uploadsSize = getDirSize(uploadsPath);
+    
+    const usedBytes = dbSize + uploadsSize;
+    const limitBytes = 512 * 1024 * 1024; // 512 MB limit
+    const percentUsed = Math.min(Math.round((usedBytes / limitBytes) * 100), 100);
+    
+    res.json({
+      usedBytes,
+      limitBytes,
+      percentUsed
+    });
+  } catch (error) {
+    console.error('Error fetching storage stats:', error);
+    res.status(500).json({ message: error.message });
+  }
+});
+
+// @desc    Reset database (keep users)
+// @route   POST /api/system/reset
+// @access  Private/SuperAdmin
+router.post('/reset', protect, superAdmin, async (req, res) => {
+  const { password, storeId } = req.body;
+  
+  if (!password) {
+    return res.status(400).json({ message: 'Password is required' });
+  }
+
+  try {
+    // Verify admin password
+    const user = await User.findById(req.user._id);
+    if (!user) {
+      return res.status(404).json({ message: 'User not found' });
+    }
+
+    const isMatch = await bcrypt.compare(password, user.password);
+    if (!isMatch) {
+      return res.status(401).json({ message: 'Invalid password' });
+    }
+
+    // Safety Check: Require explicit storeId
+    if (!storeId) {
+      return res.status(400).json({ message: 'Safety Error: storeId is required. Use "all" for full reset.' });
+    }
+
+    let filter = {};
+    let resetScope = "Full System";
+
+    if (storeId !== 'all') {
+      filter = { store: storeId };
+      resetScope = `Store: ${storeId}`;
+    }
+    // If storeId === 'all', filter remains {} (Delete All)
+
+    // Clear collections
+    await Promise.all([
+      Asset.deleteMany(filter),
+      // Store.deleteMany({}), // Preserved as per multi-store requirement
+      Request.deleteMany(filter),
+      ActivityLog.deleteMany(filter), // Logs are now store-scoped if possible
+      PurchaseOrder.deleteMany(filter),
+      Vendor.deleteMany(filter),
+      Pass.deleteMany(filter),
+      Permit.deleteMany(filter)
+    ]);
+
+    // Optional: Clear uploads folder except .gitkeep
+    // Only if full reset? Or if we track file ownership by store?
+    // Currently file ownership isn't strictly tracked by store in filesystem structure, 
+    // but referenced in DB.
+    // If we delete DB records, files become orphans.
+    // For specific store reset, cleaning files is hard without scanning all records.
+    // Let's skip file cleanup for store-specific reset to be safe, 
+    // or only do it for full reset.
+    if (!storeId || storeId === 'all') {
+        const uploadsPath = path.join(__dirname, '../uploads');
+        if (fs.existsSync(uploadsPath)) {
+          const files = fs.readdirSync(uploadsPath);
+          files.forEach(file => {
+            if (file !== '.gitkeep') {
+              fs.unlinkSync(path.join(uploadsPath, file));
+            }
+          });
+        }
+    }
+
+    // Log this action (create new log)
+    // If we just deleted logs for this store, this new log will start the history again.
+    await ActivityLog.create({
+      user: req.user.name,
+      email: req.user.email,
+      role: req.user.role,
+      action: 'System Reset',
+      details: `${resetScope} reset performed (Users preserved)`,
+      store: storeId && storeId !== 'all' ? storeId : null
+    });
+
+    res.json({ message: 'System reset successful' });
+  } catch (error) {
+    console.error('Error resetting system:', error);
+    res.status(500).json({ message: error.message });
+  }
+});
+
+// @desc    Get all stores
+// @route   GET /api/system/stores
+// @access  Private
+router.get('/stores', protect, async (req, res) => {
+  try {
+    const stores = await Store.find({});
+    res.json(stores);
+  } catch (error) {
+    res.status(500).json({ message: error.message });
+  }
+});
+
+module.exports = router;

@@ -1,0 +1,352 @@
+import { useEffect, useState } from 'react';
+import { useNavigate } from 'react-router-dom';
+import { useAuth } from '../context/AuthContext';
+import api from '../api/axios';
+import { Users, ArrowLeft, Database, AlertTriangle, X, Store, Building2, ChevronRight, Settings, ShieldCheck, Activity, Search, Lock } from 'lucide-react';
+import AddMembers from './AddMembers';
+import ChangePasswordModal from '../components/ChangePasswordModal';
+
+const Portal = () => {
+  const { user, selectStore, activeStore } = useAuth();
+  const navigate = useNavigate();
+  const [stores, setStores] = useState([]);
+  const [loading, setLoading] = useState(true);
+  const [showMembers, setShowMembers] = useState(false);
+  const [showResetModal, setShowResetModal] = useState(false);
+  const [resetStoreId, setResetStoreId] = useState('');
+  const [resetPassword, setResetPassword] = useState('');
+  const [resetLoading, setResetLoading] = useState(false);
+  const [showPasswordModal, setShowPasswordModal] = useState(false);
+
+  useEffect(() => {
+    if (user?.role !== 'Super Admin') {
+      navigate('/');
+      return;
+    }
+
+    const fetchStores = async () => {
+      try {
+        const response = await api.get('/stores?main=true');
+        setStores(response.data);
+      } catch (error) {
+        console.error('Error fetching stores:', error);
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    fetchStores();
+  }, [user, navigate]);
+
+  const handleSelectStore = (store) => {
+    selectStore(store);
+    navigate('/');
+  };
+
+  const handleResetDatabase = async () => {
+    if (!resetPassword) return alert('Password required');
+    if (!resetStoreId) return alert('Please select a scope');
+    
+    if (!window.confirm(`WARNING: Are you sure you want to reset data for ${resetStoreId === 'all' ? 'ALL STORES' : 'selected store'}? This cannot be undone.`)) return;
+
+    try {
+      setResetLoading(true);
+      await api.post('/system/reset', { 
+        password: resetPassword,
+        storeId: resetStoreId 
+      });
+      alert('Reset successful');
+      setShowResetModal(false);
+      setResetPassword('');
+      setResetStoreId('');
+      window.location.reload();
+    } catch (err) {
+      console.error(err);
+      alert(err.response?.data?.message || 'Reset failed');
+    } finally {
+      setResetLoading(false);
+    }
+  };
+
+  if (loading) return (
+    <div className="min-h-screen flex items-center justify-center bg-slate-50">
+      <div className="animate-spin rounded-full h-12 w-12 border-t-2 border-b-2 border-amber-500"></div>
+    </div>
+  );
+
+  if (showMembers) {
+    return (
+      <div className="min-h-screen bg-slate-50">
+        <header className="bg-white shadow-sm border-b border-slate-200">
+          <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 h-16 flex items-center justify-between">
+            <div className="flex items-center space-x-4">
+              <button 
+                onClick={() => setShowMembers(false)}
+                className="flex items-center text-slate-500 hover:text-slate-900 transition-colors"
+              >
+                <ArrowLeft size={20} className="mr-2" />
+                <span className="font-medium">Back to Portal</span>
+              </button>
+              <div className="h-6 w-px bg-slate-300"></div>
+              <h1 className="text-xl font-bold text-slate-900">Member Management</h1>
+            </div>
+          </div>
+        </header>
+        <div className="max-w-7xl mx-auto p-6">
+          <div className="bg-white rounded-xl shadow-sm border border-slate-200 overflow-hidden">
+             <AddMembers />
+          </div>
+        </div>
+      </div>
+    );
+  }
+
+  return (
+    <div className="min-h-screen flex flex-col font-sans text-slate-900 bg-slate-50 relative overflow-hidden">
+      
+      {/* Navbar */}
+      <header className="bg-white/80 backdrop-blur-md border-b border-slate-200 sticky top-0 z-50 transition-all duration-300">
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 h-20 flex items-center justify-between">
+          <div className="flex items-center gap-4">
+             <img src="/logo.svg" alt="Expo City Dubai" className="h-14 w-auto" />
+             <div>
+               <h1 className="text-xl font-bold tracking-tight text-slate-900 uppercase drop-shadow-sm">Expo City Dubai</h1>
+               <div className="flex items-center gap-2">
+                 <div className="h-0.5 w-4 bg-amber-500 rounded-full"></div>
+                 <p className="text-[10px] text-slate-500 tracking-[0.2em] uppercase font-bold">Asset Management Portal</p>
+               </div>
+             </div>
+          </div>
+          
+          <div className="flex items-center gap-6">
+            <div className="text-right hidden sm:block">
+              <div className="text-sm font-bold text-slate-800 tracking-wide">{user?.name}</div>
+              <div className="flex items-center justify-end gap-1.5">
+                <span className="w-1.5 h-1.5 rounded-full bg-green-500 animate-pulse"></span>
+                <div className="text-[10px] text-amber-600 font-bold uppercase tracking-widest">Super Admin Access</div>
+              </div>
+            </div>
+            
+            <div 
+              onClick={() => setShowPasswordModal(true)}
+              className="w-10 h-10 rounded-full bg-slate-100 border border-slate-200 flex items-center justify-center text-slate-600 hover:bg-slate-200 hover:text-slate-900 transition-all cursor-pointer shadow-sm"
+              title="Change Password"
+            >
+              <Lock size={18} />
+            </div>
+
+            <div className="w-10 h-10 rounded-full bg-slate-100 border border-slate-200 flex items-center justify-center text-slate-600 hover:bg-slate-200 hover:text-slate-900 transition-all cursor-pointer shadow-sm">
+              <ShieldCheck size={20} />
+            </div>
+          </div>
+        </div>
+      </header>
+
+      {/* Main Content */}
+      <main className="flex-1 max-w-7xl mx-auto w-full px-4 sm:px-6 lg:px-8 py-12 relative z-10">
+        
+        {/* Welcome Section */}
+        <div className="mb-10 text-center">
+          <h2 className="text-4xl font-bold text-slate-900 mb-3 tracking-tight">Welcome Back, {user?.name}</h2>
+          <p className="text-slate-500 text-lg max-w-2xl mx-auto">
+            Select a workspace to manage assets or use the admin tools below.
+          </p>
+        </div>
+
+        {/* Stores Grid Section */}
+        <div className="mb-16">
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8">
+            {stores.map((store) => (
+              <button
+                key={store._id}
+                onClick={() => handleSelectStore(store)}
+                className={`group relative bg-white border border-slate-200 rounded-2xl p-6 shadow-sm hover:shadow-xl hover:border-amber-500/30 transition-all duration-300 text-left flex flex-col justify-between h-56 overflow-hidden ${
+                  activeStore?._id === store._id 
+                    ? 'ring-2 ring-amber-500 shadow-amber-500/10' 
+                    : ''
+                }`}
+              >
+                <div className="absolute top-0 right-0 w-32 h-32 bg-gradient-to-br from-amber-500/10 to-transparent rounded-bl-full -mr-10 -mt-10 transition-transform group-hover:scale-110 opacity-50 group-hover:opacity-100"></div>
+                
+                <div className="relative z-10">
+                  <div className="flex items-center justify-between mb-6">
+                    <div className="w-14 h-14 rounded-2xl bg-slate-50 border border-slate-100 flex items-center justify-center text-slate-700 group-hover:bg-amber-500 group-hover:text-white group-hover:border-amber-500 transition-all shadow-inner">
+                      <Building2 size={28} />
+                    </div>
+                    {activeStore?._id === store._id && (
+                      <span className="inline-flex items-center px-3 py-1 rounded-full text-xs font-bold bg-green-50 text-green-600 border border-green-200">
+                        ACTIVE
+                      </span>
+                    )}
+                  </div>
+                  
+                  <h4 className="text-2xl font-bold text-slate-900 mb-1 group-hover:text-amber-600 transition-colors tracking-wide">
+                    {store.name}
+                  </h4>
+                  <p className="text-sm text-slate-400 font-mono">ID: {store._id.substring(store._id.length - 6).toUpperCase()}</p>
+                </div>
+
+                <div className="relative z-10 pt-4 border-t border-slate-100 mt-auto flex justify-between items-center">
+                  <span className="text-xs font-medium text-slate-400 uppercase tracking-widest flex items-center gap-2">
+                    <div className={`w-2 h-2 rounded-full ${store.isActive ? 'bg-green-500' : 'bg-green-500'}`}></div>
+                    {store.openingTime} - {store.closingTime}
+                  </span>
+                  <div className="flex items-center text-amber-500 text-sm font-bold opacity-0 group-hover:opacity-100 transition-all transform translate-x-4 group-hover:translate-x-0">
+                    ENTER <ChevronRight size={16} className="ml-1" />
+                  </div>
+                </div>
+              </button>
+            ))}
+          </div>
+        </div>
+
+        {/* Quick Actions Grid - Admin Tools */}
+        <div className="mb-8">
+           <h3 className="text-sm font-bold text-slate-400 uppercase tracking-widest mb-6 border-b border-slate-200 pb-2">
+             Admin Utilities
+           </h3>
+           <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+             {/* Manage Members Card */}
+             <div 
+               onClick={() => setShowMembers(true)}
+               className="bg-white border border-slate-200 rounded-xl p-5 hover:bg-slate-50 hover:border-blue-500/30 cursor-pointer transition-all group flex items-center gap-5 shadow-sm"
+             >
+               <div className="p-4 bg-blue-50 rounded-lg text-blue-600 group-hover:bg-blue-500 group-hover:text-white transition-colors border border-blue-100">
+                 <Users size={24} />
+               </div>
+               <div>
+                 <h3 className="text-lg font-bold text-slate-900 mb-1 group-hover:text-blue-600 transition-colors">Manage Members</h3>
+                 <p className="text-slate-500 text-sm">Add/Remove Admins & Technicians</p>
+               </div>
+               <ChevronRight size={20} className="ml-auto text-slate-400 group-hover:text-blue-500 group-hover:translate-x-1 transition-all" />
+             </div>
+
+             {/* System Maintenance Card */}
+             <div 
+               onClick={() => setShowResetModal(true)}
+               className="bg-white border border-slate-200 rounded-xl p-5 hover:bg-slate-50 hover:border-red-500/30 cursor-pointer transition-all group flex items-center gap-5 shadow-sm"
+             >
+               <div className="p-4 bg-red-50 rounded-lg text-red-600 group-hover:bg-red-500 group-hover:text-white transition-colors border border-red-100">
+                 <Database size={24} />
+               </div>
+               <div>
+                 <h3 className="text-lg font-bold text-slate-900 mb-1 group-hover:text-red-600 transition-colors">System Reset</h3>
+                 <p className="text-slate-500 text-sm">Database Maintenance & Config</p>
+               </div>
+               <Settings size={20} className="ml-auto text-slate-400 group-hover:text-red-500 group-hover:rotate-45 transition-all" />
+             </div>
+          </div>
+        </div>
+      </main>
+
+      {/* Footer */}
+      <footer className="bg-white/60 backdrop-blur-md border-t border-slate-200 py-6 mt-auto relative z-10 text-slate-500">
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 flex flex-col md:flex-row justify-between items-center gap-4">
+           <p className="text-sm">© {new Date().getFullYear()} Expo City Dubai. All rights reserved.</p>
+           <div className="flex gap-6 text-sm opacity-80">
+             <span>v2.5.0 (Enterprise)</span>
+             <span className="flex items-center gap-2"><div className="w-1.5 h-1.5 rounded-full bg-green-500"></div> System Status: Online</span>
+           </div>
+        </div>
+      </footer>
+
+      <ChangePasswordModal 
+        isOpen={showPasswordModal} 
+        onClose={() => setShowPasswordModal(false)} 
+      />
+
+      {/* Reset Database Modal */}
+      {showResetModal && (
+        <div className="fixed inset-0 bg-slate-900/40 backdrop-blur-sm flex items-center justify-center p-4 z-50 transition-opacity">
+          <div className="bg-white rounded-2xl p-0 max-w-md w-full shadow-2xl overflow-hidden animate-scale-in">
+            {/* Modal Header */}
+            <div className="bg-red-50 p-6 border-b border-red-100 flex justify-between items-start">
+              <div className="flex items-center gap-3">
+                 <div className="p-2 bg-red-100 rounded-lg text-red-600">
+                    <AlertTriangle size={24} />
+                 </div>
+                 <div>
+                    <h2 className="text-lg font-bold text-red-900">Reset Database</h2>
+                    <p className="text-sm text-red-600">Critical Action Warning</p>
+                 </div>
+              </div>
+              <button 
+                onClick={() => setShowResetModal(false)} 
+                className="text-slate-400 hover:text-slate-600 p-1 hover:bg-slate-100 rounded-full transition-colors"
+              >
+                <X size={20} />
+              </button>
+            </div>
+            
+            <div className="p-6">
+              <div className="bg-yellow-50 border border-yellow-100 rounded-lg p-4 mb-6">
+                 <p className="text-sm text-yellow-800 leading-relaxed">
+                   <strong>Warning:</strong> This action will permanently delete all transactional data (Assets, Requests, Purchase Orders) for the selected scope. <br/><br/>
+                   <span className="font-semibold">Safe Data:</span> Users, Products, and Categories will be <span className="underline">preserved</span>.
+                 </p>
+              </div>
+
+              <div className="space-y-5">
+                <div>
+                  <label className="block text-sm font-semibold text-slate-700 mb-2">Select Target Scope</label>
+                  <div className="relative">
+                    <select 
+                      value={resetStoreId} 
+                      onChange={(e) => setResetStoreId(e.target.value)}
+                      className="w-full appearance-none border border-slate-300 rounded-lg p-3 pr-10 focus:ring-2 focus:ring-red-500 focus:border-red-500 outline-none bg-white text-slate-900 transition-shadow"
+                    >
+                      <option value="">-- Select Store to Reset --</option>
+                      {stores.map(store => (
+                        <option key={store._id} value={store._id}>{store.name}</option>
+                      ))}
+                    </select>
+                    <div className="absolute right-3 top-1/2 -translate-y-1/2 pointer-events-none text-slate-400">
+                       <Store size={16} />
+                    </div>
+                  </div>
+                </div>
+
+                <div>
+                  <label className="block text-sm font-semibold text-slate-700 mb-2">Super Admin Password</label>
+                  <input 
+                    type="password" 
+                    value={resetPassword}
+                    onChange={(e) => setResetPassword(e.target.value)}
+                    className="w-full border border-slate-300 rounded-lg p-3 focus:ring-2 focus:ring-red-500 focus:border-red-500 outline-none transition-shadow"
+                    placeholder="Enter password to confirm..."
+                  />
+                </div>
+
+                <div className="pt-2">
+                  <button 
+                    onClick={handleResetDatabase}
+                    disabled={resetLoading || !resetStoreId || !resetPassword}
+                    className="w-full bg-red-600 text-white py-3.5 rounded-lg hover:bg-red-700 disabled:opacity-50 disabled:cursor-not-allowed transition-all font-bold shadow-md hover:shadow-lg flex items-center justify-center gap-2"
+                  >
+                    {resetLoading ? (
+                      <>
+                        <div className="w-5 h-5 border-2 border-white/30 border-t-white rounded-full animate-spin"></div>
+                        <span>Processing Reset...</span>
+                      </>
+                    ) : (
+                      <>
+                        <Database size={18} />
+                        <span>Confirm Database Reset</span>
+                      </>
+                    )}
+                  </button>
+                </div>
+              </div>
+            </div>
+            
+            <div className="bg-slate-50 px-6 py-3 border-t border-slate-100 text-center">
+               <p className="text-xs text-slate-400">Action ID: {Math.random().toString(36).substr(2, 9).toUpperCase()}</p>
+            </div>
+          </div>
+        </div>
+      )}
+    </div>
+  );
+};
+
+export default Portal;

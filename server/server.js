@@ -1,0 +1,178 @@
+const express = require('express');
+const mongoose = require('mongoose');
+const dotenv = require('dotenv');
+const cors = require('cors');
+const path = require('path');
+const seedCategories = require('./utils/seedCategories'); // Import seeder
+const seedStoresAndUsers = require('./utils/seedStoresAndUsers');
+const compression = require('compression');
+
+// Routes
+const authRoutes = require('./routes/auth');
+const storeRoutes = require('./routes/stores');
+const userRoutes = require('./routes/users');
+const assetRoutes = require('./routes/assets');
+const requestRoutes = require('./routes/requests');
+const passRoutes = require('./routes/passes');
+const vendorRoutes = require('./routes/vendors');
+const poRoutes = require('./routes/purchaseOrders');
+const assetCategoryRoutes = require('./routes/assetCategories');
+const permitRoutes = require('./routes/permits');
+const systemRoutes = require('./routes/system');
+
+// Models for seeding
+const Store = require('./models/Store');
+
+const Asset = require('./models/Asset');
+const Request = require('./models/Request');
+const AssetCategory = require('./models/AssetCategory');
+
+dotenv.config();
+
+const app = express();
+
+app.use(compression({
+  level: 6,
+  threshold: 0,
+  filter: (req, res) => {
+    if (req.headers['x-no-compression']) {
+      return false;
+    }
+    return compression.filter(req, res);
+  }
+}));
+app.use(cors());
+app.use(express.json());
+app.use('/uploads', express.static(path.join(__dirname, 'uploads')));
+
+// Routes Middleware
+app.use('/api/auth', authRoutes);
+app.use('/api/stores', storeRoutes);
+app.use('/api/users', userRoutes);
+app.use('/api/assets', assetRoutes);
+app.use('/api/requests', requestRoutes);
+app.use('/api/passes', passRoutes);
+app.use('/api/vendors', vendorRoutes);
+app.use('/api/purchase-orders', poRoutes);
+app.use('/api/asset-categories', assetCategoryRoutes);
+app.use('/api/permits', permitRoutes);
+app.use('/api/system', systemRoutes);
+
+const User = require('./models/User');
+const bcrypt = require('bcryptjs');
+const ActivityLog = require('./models/ActivityLog');
+const { protect, admin } = require('./middleware/authMiddleware');
+
+// Serve built client in production
+const clientDist = path.resolve(__dirname, '../client/dist');
+try {
+  const fs = require('fs');
+  if (fs.existsSync(clientDist)) {
+    console.log('Serving static files from:', clientDist);
+    app.use(express.static(clientDist));
+    app.get(/^\/(?!api).*/, (req, res) => {
+      console.log('Serving index.html for:', req.url);
+      res.sendFile(path.join(clientDist, 'index.html'));
+    });
+  } else {
+    console.log('Client dist folder not found at:', clientDist);
+  }
+} catch (error) {
+  console.error('Error setting up static files:', error);
+}
+
+// Connect to MongoDB
+mongoose.connect(process.env.MONGO_URI)
+  .then(async () => {
+    console.log('MongoDB Connected');
+    await seedCategories();
+    await seedStoresAndUsers();
+    dropSerialUniqueIndex();
+  })
+  .catch(err => console.log(err));
+
+// Seed Default Stores
+const seedStores = async () => {
+  const stores = [
+    "Mobility Car Park Store-10",
+    "Mobility Car Park Store-8",
+    "Sustainability Basement Store",
+    "Terra Basement Store",
+    "Al Wasl 3 Level 2 Store"
+  ];
+
+  try {
+    const count = await Store.countDocuments();
+    if (count === 0) {
+      const storeDocs = stores.map(name => ({ name }));
+      await Store.insertMany(storeDocs);
+      console.log('Default stores seeded');
+    }
+  } catch (error) {
+    console.error('Error seeding stores:', error);
+  }
+};
+
+// Seed Default Asset Categories
+const seedAssetCategories = async () => {
+  const categories = [
+    'Access Control Systems',
+    'Surveillance System',
+    'Networking',
+    'Telephony',
+    'Structured Cabling',
+    'Tools',
+    'Wireless',
+    'Audio Visual'
+  ];
+
+  try {
+    const count = await AssetCategory.countDocuments();
+    if (count === 0) {
+      await AssetCategory.insertMany(categories.map(name => ({ name })));
+      console.log('Default asset categories seeded');
+    }
+  } catch (error) {
+    console.error('Error seeding asset categories:', error);
+  }
+};
+
+const dropSerialUniqueIndex = async () => {
+  try {
+    const collection = mongoose.connection.collection('assets');
+    const indexes = await collection.indexes();
+    const serialIndex = indexes.find(idx => idx.name === 'serialNumber_1');
+    
+    if (serialIndex) {
+      await collection.dropIndex('serialNumber_1');
+      console.log('Dropped unique index on serialNumber');
+    }
+  } catch (error) {
+    // Index might not exist, ignore error
+  }
+};
+
+const seedAdmin = async () => {
+  try {
+    const userCount = await User.countDocuments();
+    if (userCount === 0) {
+      const salt = await bcrypt.genSalt(10);
+      const hashedPassword = await bcrypt.hash('123456', salt);
+      
+      await User.create({
+        name: 'Admin User',
+        email: 'admin@example.com',
+        password: hashedPassword,
+        role: 'Admin',
+        employeeId: 'ADMIN001'
+      });
+      console.log('Admin user seeded');
+    }
+  } catch (error) {
+    console.error('Error seeding admin:', error);
+  }
+};
+
+const PORT = process.env.PORT || 5000;
+
+app.listen(PORT, () => console.log(`Server running on port ${PORT}`));
