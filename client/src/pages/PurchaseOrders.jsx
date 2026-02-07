@@ -1,9 +1,9 @@
 import { useState, useEffect } from 'react';
 import api from '../api/axios';
-import { Plus, Edit, Trash2, Eye, Printer, Paperclip, Download } from 'lucide-react';
+import { Plus, Edit, Trash2, Eye, Printer, Paperclip, Download, FileSpreadsheet } from 'lucide-react';
 import * as XLSX from 'xlsx';
 
-const PurchaseOrders = () => {
+const PurchaseOrders = ({ onImportClick, headerActions }) => {
   const [pos, setPos] = useState([]);
   const [vendors, setVendors] = useState([]);
   const [view, setView] = useState('list'); // list, form
@@ -534,15 +534,24 @@ const PurchaseOrders = () => {
       <div className="flex justify-between items-center mb-6">
         <h1 className="text-2xl font-bold">Purchase Orders</h1>
         <div className="flex gap-2">
+          {headerActions}
+          {onImportClick && (
+            <button
+              onClick={onImportClick}
+              className="bg-green-600 text-white px-4 py-2 rounded flex items-center gap-2 hover:bg-green-700 shadow-sm transition-all"
+            >
+              <FileSpreadsheet size={20} /> Import Assets
+            </button>
+          )}
           <button
             onClick={exportPOs}
-            className="bg-green-600 text-white px-4 py-2 rounded flex items-center gap-2 hover:bg-green-700"
+            className="bg-green-600 text-white px-4 py-2 rounded flex items-center gap-2 hover:bg-green-700 shadow-sm transition-all"
           >
             <Download size={20} /> Export POs
           </button>
           <button
             onClick={() => { resetForm(); setView('form'); }}
-            className="bg-amber-600 text-white px-4 py-2 rounded flex items-center gap-2 hover:bg-amber-700"
+            className="bg-amber-600 text-white px-4 py-2 rounded flex items-center gap-2 hover:bg-amber-700 shadow-sm transition-all"
           >
             <Plus size={20} /> New PO
           </button>

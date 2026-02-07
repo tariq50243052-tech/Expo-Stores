@@ -78,7 +78,7 @@ const assetSchema = new mongoose.Schema({
   },
   status: {
     type: String,
-    enum: ['New', 'Used', 'Faulty', 'Disposed', 'Under Repair'],
+    enum: ['New', 'Used', 'Faulty', 'Disposed', 'Under Repair', 'In Use', 'Testing'],
     default: 'New',
     index: true
   },
@@ -92,42 +92,29 @@ const assetSchema = new mongoose.Schema({
     phone: String,
     note: String
   },
+  source: {
+    type: String,
+    enum: ['Vendor', 'Contractor', 'Technician', 'Initial Setup', 'Other'],
+    default: 'Initial Setup',
+    index: true
+  },
   return_pending: {
     type: Boolean,
-    default: false
+    default: false,
+    index: true // Indexed for quick return checks
   },
   return_request: {
-    condition: { type: String, enum: ['New', 'Used', 'Faulty'] },
-    ticket_number: String,
+    condition: { type: String, enum: ['New', 'Used', 'Faulty', 'Under Repair'] },
     requested_by: { type: mongoose.Schema.Types.ObjectId, ref: 'User' },
-    requested_by_name: String,
-    requested_at: { type: Date }
-  },
-  history: [{
-    action: String,
     ticket_number: String,
-    user: String,
-    details: String,
-    date: { type: Date, default: Date.now }
-  }]
+    notes: String
+  }
 }, { timestamps: true });
 
-// Compound index for finding assets by serial number within a store (optional but good for performance)
-assetSchema.index({ store: 1, serial_number: 1 });
-assetSchema.index({ store: 1, serial_last_4: 1 });
-// Performance indexes for sorting and filtering
-assetSchema.index({ store: 1, updatedAt: -1 });
+// Compound Indexes for Common Filters
 assetSchema.index({ store: 1, status: 1 });
-assetSchema.index({ updatedAt: -1 });
-
-// Text index for fast search
-assetSchema.index({
-  name: 'text',
-  model_number: 'text',
-  serial_number: 'text',
-  manufacturer: 'text',
-  product_name: 'text',
-  ticket_number: 'text'
-});
+assetSchema.index({ store: 1, category: 1 });
+assetSchema.index({ store: 1, serial_number: 1 }); // For duplicate checks
+assetSchema.index({ store: 1, model_number: 1 });
 
 module.exports = mongoose.model('Asset', assetSchema);

@@ -1,5 +1,5 @@
 import { useState, useEffect, useCallback } from 'react';
-import { Edit2, Trash2, X } from 'lucide-react';
+import { Pencil, Trash2, X } from 'lucide-react';
 import api from '../api/axios';
 import { useAuth } from '../context/AuthContext';
 
@@ -24,36 +24,37 @@ const AddMembers = () => {
   const [fetching, setFetching] = useState(false);
   const [message, setMessage] = useState({ type: '', text: '' });
 
-  useEffect(() => {
-    fetchStores();
-  }, []);
-
-  useEffect(() => {
-    fetchMembers();
-  }, [fetchMembers]);
-
-  const fetchStores = async () => {
-    try {
-      // Only fetch Main Stores for assignment
-      const res = await api.get('/stores?main=true');
-      setStores(res.data);
-    } catch (err) {
-      console.error(err);
-    }
-  };
-
   const fetchMembers = useCallback(async () => {
     setFetching(true);
     try {
       const endpoint = activeTab === 'technician' ? '/users' : '/users/admins';
       const res = await api.get(endpoint);
-      setMembers(res.data);
+      setMembers(Array.isArray(res.data) ? res.data : []);
     } catch (err) {
-      console.error(err);
+      console.error('Error fetching members:', err);
+      setMessage({ type: 'error', text: 'Failed to fetch members' });
+      setMembers([]); // Ensure it's an array on error
     } finally {
       setFetching(false);
     }
   }, [activeTab]);
+
+  useEffect(() => {
+    fetchMembers();
+  }, [fetchMembers]);
+
+  useEffect(() => {
+    const fetchStores = async () => {
+      try {
+        const res = await api.get('/stores?main=true');
+        setStores(Array.isArray(res.data) ? res.data : []);
+      } catch (err) {
+        console.error('Error fetching stores:', err);
+        setStores([]); // Ensure it's an array on error
+      }
+    };
+    fetchStores();
+  }, []);
 
   const handleChange = (e) => {
     setFormData({ ...formData, [e.target.name]: e.target.value });
@@ -355,10 +356,10 @@ const AddMembers = () => {
                         <td className="px-6 py-4 whitespace-nowrap text-right text-sm font-medium">
                           <button
                             onClick={() => handleEdit(member)}
-                            className="text-indigo-600 hover:text-indigo-900 mr-4"
+                            className="text-blue-600 hover:text-blue-900 mr-3"
                             title="Edit"
                           >
-                            <Edit2 size={18} />
+                            <Pencil size={18} />
                           </button>
                           <button
                             onClick={() => handleDelete(member._id)}

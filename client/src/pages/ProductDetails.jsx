@@ -62,22 +62,44 @@ const ProductDetails = () => {
   // Calculate stats
   const stats = {
     total: assets.length,
-    inUse: assets.filter(a => a.status === 'Used').length,
-    inStore: assets.filter(a => a.status === 'New').length,
+    inUse: assets.filter(a => !['Faulty', 'Disposed', 'Under Repair'].includes(a.status) && (a.assigned_to || (a.assigned_to_external && a.assigned_to_external.name))).length,
+    inStore: assets.filter(a => !['Faulty', 'Disposed', 'Under Repair'].includes(a.status) && !a.assigned_to && (!a.assigned_to_external || !a.assigned_to_external.name)).length,
     faulty: assets.filter(a => a.status === 'Faulty').length,
     disposed: assets.filter(a => a.status === 'Disposed').length,
     underRepair: assets.filter(a => a.status === 'Under Repair').length
   };
 
-  const getStatusColor = (status) => {
-    switch (status) {
-      case 'New': return 'bg-green-100 text-green-800';
-      case 'Used': return 'bg-blue-100 text-blue-800';
-      case 'Faulty': return 'bg-red-100 text-red-800';
-      case 'Under Repair': return 'bg-orange-100 text-orange-800';
-      case 'Disposed': return 'bg-gray-100 text-gray-800';
-      default: return 'bg-gray-100 text-gray-800';
+  const getDerivedStatus = (asset) => {
+    // 1. Condition-based statuses (Priority over Assignment)
+    if (asset.status === 'Faulty') {
+      return { label: 'Faulty', color: 'bg-red-100 text-red-800' };
     }
+    if (asset.status === 'Under Repair') {
+      return { label: 'Under Repair', color: 'bg-amber-100 text-amber-800' };
+    }
+    if (asset.status === 'Disposed') {
+      return { label: 'Disposed', color: 'bg-gray-100 text-gray-800' };
+    }
+
+    if (asset.status === 'Testing') {
+      return { label: 'Testing', color: 'bg-indigo-100 text-indigo-800' };
+    }
+
+    // 2. Assignment status
+    if (asset.assigned_to || (asset.assigned_to_external && asset.assigned_to_external.name)) {
+      return { label: 'In Use', color: 'bg-blue-100 text-blue-800' };
+    }
+
+    // 3. Spare status (Only for Available New/Used)
+    if (asset.status === 'New') {
+      return { label: 'In Store (New)', color: 'bg-green-100 text-green-800' };
+    }
+    if (asset.status === 'Used') {
+      return { label: 'In Store (Used)', color: 'bg-green-100 text-green-800' };
+    }
+
+    // 4. Fallback
+    return { label: asset.status, color: 'bg-gray-100 text-gray-800' };
   };
 
   const getInstallationDate = (asset) => {
@@ -208,7 +230,7 @@ const ProductDetails = () => {
               <span className="text-xl font-bold text-blue-700">{stats.inUse}</span>
             </div>
             <div className="bg-green-50 px-4 py-2 rounded-lg border border-green-100 shadow-sm">
-              <span className="text-xs font-bold text-green-400 uppercase tracking-wider block">In Store</span>
+              <span className="text-xs font-bold text-green-400 uppercase tracking-wider block">Spare</span>
               <span className="text-xl font-bold text-green-700">{stats.inStore}</span>
             </div>
             <div className="bg-red-50 px-4 py-2 rounded-lg border border-red-100 shadow-sm">
@@ -264,9 +286,14 @@ const ProductDetails = () => {
                       </div>
                     </td>
                     <td className="px-6 py-4 whitespace-nowrap">
-                      <span className={`px-3 py-1 inline-flex text-xs leading-5 font-semibold rounded-full ${getStatusColor(asset.status)}`}>
-                        {asset.status}
-                      </span>
+                      {(() => {
+                        const { label, color } = getDerivedStatus(asset);
+                        return (
+                          <span className={`px-3 py-1 inline-flex text-xs leading-5 font-semibold rounded-full ${color}`}>
+                            {label}
+                          </span>
+                        );
+                      })()}
                     </td>
                     <td className="px-6 py-4 whitespace-nowrap">
                       {asset.assigned_to ? (

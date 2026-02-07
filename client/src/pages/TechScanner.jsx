@@ -144,6 +144,8 @@ const TechScanner = () => {
     if (lastByMe && lastByMe.action === 'Reported Faulty') {
       return 'Return/Faulty';
     }
+    if (a.status === 'New') return 'In Store (New)';
+    if (a.status === 'Used') return 'In Store (Used)';
     return a.status;
   };
 
@@ -242,8 +244,9 @@ const TechScanner = () => {
                 onChange={(e) => setAddForm({ ...addForm, status: e.target.value })}
                 className="w-full border p-2 rounded"
               >
-                <option value="New">New</option>
-                <option value="Used">Used</option>
+                <option value="New">In Store (New)</option>
+                <option value="Used">In Store (Used)</option>
+                <option value="Testing">Testing</option>
                 <option value="Faulty">Faulty</option>
               </select>
             </div>
@@ -308,9 +311,9 @@ const TechScanner = () => {
             <div className="grid grid-cols-2 gap-4">
               <button 
                 onClick={() => handleAction('collect')}
-                disabled={asset.assigned_to || asset.status === 'Faulty' || asset.status === 'Disposed'}
+                disabled={asset.assigned_to || asset.status === 'Faulty' || asset.status === 'Disposed' || asset.status === 'Under Repair'}
                 className={`py-3 rounded text-white font-medium ${
-                  (!asset.assigned_to && asset.status !== 'Faulty' && asset.status !== 'Disposed')
+                  (!asset.assigned_to && asset.status !== 'Faulty' && asset.status !== 'Disposed' && asset.status !== 'Under Repair')
                     ? 'bg-green-600 hover:bg-green-700'
                     : 'bg-gray-400 cursor-not-allowed'
                 }`}
@@ -333,6 +336,7 @@ const TechScanner = () => {
                 <option value="New">Return as New</option>
                 <option value="Used">Return as Used</option>
                 <option value="Faulty">Return as Faulty</option>
+                <option value="Under Repair">Return as Under Repair</option>
               </select>
               <button
                 onClick={handleReturn}

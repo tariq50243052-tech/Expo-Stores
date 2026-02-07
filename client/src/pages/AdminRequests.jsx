@@ -32,8 +32,16 @@ const AdminRequests = () => {
   useEffect(() => { load(); }, [load]);
 
   const updateStatus = async (id, s) => {
-    await api.put(`/requests/${id}`, { status: s });
-    load();
+    // Optimistic UI update so the label changes immediately
+    setRequests(prev => prev.map(r => r._id === id ? { ...r, status: s, updatedAt: new Date().toISOString() } : r));
+    try {
+      await api.put(`/requests/${id}`, { status: s });
+    } catch (err) {
+      // If API fails, reload to reflect actual state
+      console.error(err);
+    } finally {
+      load();
+    }
   };
   
   const exportExcel = async () => {
@@ -109,11 +117,19 @@ const AdminRequests = () => {
                   <td className="px-6 py-4">{r.status}</td>
                   <td className="px-6 py-4 text-sm text-gray-500">{new Date(r.updatedAt).toLocaleString()}</td>
                   <td className="px-6 py-4">
-                    <div className="flex gap-2">
-                      <button onClick={() => updateStatus(r._id, 'Approved')} className="text-green-600">Approve</button>
-                      <button onClick={() => updateStatus(r._id, 'Ordered')} className="text-amber-600">Mark Ordered</button>
-                      <button onClick={() => updateStatus(r._id, 'Rejected')} className="text-red-600">Reject</button>
-                    </div>
+                    {r.status === 'Approved' ? (
+                      <span className="text-green-600 font-semibold">Approved</span>
+                    ) : r.status === 'Ordered' ? (
+                      <span className="text-amber-600 font-semibold">Ordered</span>
+                    ) : r.status === 'Rejected' ? (
+                      <span className="text-red-600 font-semibold">Rejected</span>
+                    ) : (
+                      <div className="flex gap-2">
+                        <button onClick={() => updateStatus(r._id, 'Approved')} className="text-green-600">Approve</button>
+                        <button onClick={() => updateStatus(r._id, 'Ordered')} className="text-amber-600">Mark Ordered</button>
+                        <button onClick={() => updateStatus(r._id, 'Rejected')} className="text-red-600">Reject</button>
+                      </div>
+                    )}
                   </td>
                 </tr>
               ))}

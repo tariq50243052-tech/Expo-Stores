@@ -9,6 +9,7 @@ const Assets = () => {
   const searchParams = new URLSearchParams(location.search);
   const categoryParam = searchParams.get('category');
   const statusParam = searchParams.get('status');
+  const actionParam = searchParams.get('action');
 
   const [assets, setAssets] = useState([]);
   const [stores, setStores] = useState([]);
@@ -66,12 +67,6 @@ const Assets = () => {
   const [filterStatus, setFilterStatus] = useState('');
   const [filterCategory, setFilterCategory] = useState('');
   
-  // Sync category & status params from URL
-  useEffect(() => {
-    setFilterCategory(categoryParam || '');
-    if (statusParam) setFilterStatus(statusParam);
-  }, [categoryParam, statusParam]);
-
   // Advanced Filters
   const [showAdvancedFilters, setShowAdvancedFilters] = useState(false);
   const [filterManufacturer, setFilterManufacturer] = useState('');
@@ -93,6 +88,14 @@ const Assets = () => {
   const [showImportModal, setShowImportModal] = useState(false);
   const [categories, setCategories] = useState([]);
   const [fullCategories, setFullCategories] = useState([]);
+
+  // Sync category & status params from URL
+  useEffect(() => {
+    setFilterCategory(categoryParam || '');
+    if (statusParam) setFilterStatus(statusParam);
+    if (actionParam === 'add') setShowAddModal(true);
+  }, [categoryParam, statusParam, actionParam]);
+
 
   // Hierarchical State for Add/Import
   const [selectedCategory, setSelectedCategory] = useState('');
@@ -141,6 +144,7 @@ const Assets = () => {
 
   const fetchAssets = async (params) => {
     try {
+      setLoading(true);
       const response = await api.get('/assets', {
         params: {
           page,
@@ -281,6 +285,11 @@ const Assets = () => {
 
   const handleEditClick = (asset) => {
     setEditingAsset(asset);
+    let initialStatus = asset.status;
+    if ((asset.assigned_to || (asset.assigned_to_external && asset.assigned_to_external.name)) && (asset.status === 'New' || asset.status === 'Used')) {
+      initialStatus = 'In Use';
+    }
+
     setFormData({
       name: asset.name,
       model_number: asset.model_number,
@@ -292,7 +301,7 @@ const Assets = () => {
       qr_code: asset.qr_code || '',
       category: asset.category || 'Other',
       store: asset.store?._id || '',
-      status: asset.status
+      status: initialStatus
     });
   };
 
@@ -302,7 +311,28 @@ const Assets = () => {
 
   const handleSave = async () => {
     try {
-      await api.put(`/assets/${editingAsset._id}`, formData);
+      const updateData = { ...formData };
+      
+      // Handle "In Use" virtual status
+      if (updateData.status === 'In Use') {
+        // If it was already assigned, keep the underlying status (or default to Used)
+        // We don't change assignment here.
+        // If it wasn't assigned, we can't really make it "In Use" without a user.
+        // But for now, let's map it to 'Used' if the original was 'New' or 'Used'.
+        updateData.status = 'Used'; 
+        
+        // Check if actually assigned
+        if (!editingAsset.assigned_to && (!editingAsset.assigned_to_external || !editingAsset.assigned_to_external.name)) {
+             alert("You cannot set status to 'In Use' without assigning the asset first. Please use the Assign button.");
+             return;
+        }
+      } else if (updateData.status === 'New' || updateData.status === 'Used') {
+        // If setting to Spare (New/Used), we must unassign
+        updateData.assigned_to = null;
+        updateData.assigned_to_external = null;
+      }
+
+      await api.put(`/assets/${editingAsset._id}`, updateData);
       setEditingAsset(null);
       fetchAssets();
       alert('Asset updated successfully');
@@ -484,17 +514,32 @@ const Assets = () => {
   };
 
   const getDerivedStatus = (asset) => {
+    // 1. Condition-based statuses (Priority over Assignment)
+    // These statuses must ALWAYS be displayed regardless of assignment
+    if (asset.status === 'Faulty') {
+      return { label: 'Faulty', color: 'bg-red-100 text-red-800' };
+    }
+    if (asset.status === 'Under Repair') {
+      return { label: 'Under Repair', color: 'bg-amber-100 text-amber-800' };
+    }
+    if (asset.status === 'Disposed') {
+      return { label: 'Disposed', color: 'bg-gray-100 text-gray-800' };
+    }
+
+    // 2. Assignment status
     if (asset.assigned_to || (asset.assigned_to_external && asset.assigned_to_external.name)) {
       return { label: 'In Use', color: 'bg-blue-100 text-blue-800' };
     }
-    return { label: 'Spare', color: 'bg-green-100 text-green-800' };
+
+    // 3. Spare status (Only for Available New/Used)
+    if (asset.status === 'New' || asset.status === 'Used') {
+      return { label: 'Spare', color: 'bg-green-100 text-green-800' };
+    }
+
+    // 4. Fallback
+    return { label: asset.status, color: 'bg-gray-100 text-gray-800' };
   };
 
-  useEffect(() => {
-    // Only fetch stores/technicians once
-    fetchStores();
-    fetchTechnicians();
-  }, []);
 
   // Debounced filter/search effect
   useEffect(() => {
@@ -514,8 +559,6 @@ const Assets = () => {
     fetchAssets();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [page, limit]);
-
-  if (loading) return <div>Loading...</div>;
 
   return (
     <div>
@@ -627,6 +670,7 @@ const Assets = () => {
             <option value="New">New</option>
             <option value="Used">Used</option>
             <option value="Faulty">Faulty</option>
+            <option value="Under Repair">Under Repair</option>
             <option value="Disposed">Disposed</option>
           </select>
           <div className="flex gap-2">
@@ -746,6 +790,13 @@ const Assets = () => {
         )}
       </div>
 
+      {/* Loading Indicator */}
+      {loading && (
+        <div className="bg-white rounded-lg shadow p-4 mb-4 text-center text-gray-500">
+          Loading assets...
+        </div>
+      )}
+
       {/* Desktop Table View */}
       <div className="hidden md:block bg-white rounded-lg shadow overflow-x-auto">
         <table className="min-w-full">
@@ -779,8 +830,8 @@ const Assets = () => {
                 <td className="px-3 py-2 md:px-6 md:py-4 whitespace-nowrap text-center text-sm hidden lg:table-cell">{asset.mac_address || '-'}</td>
                 <td className="px-3 py-2 md:px-6 md:py-4 whitespace-nowrap text-center text-sm hidden xl:table-cell">{asset.manufacturer || '-'}</td>
                 <td className="px-3 py-2 md:px-6 md:py-4 whitespace-nowrap text-center text-sm font-medium text-gray-700">
-                  {asset.status === 'New' ? 'Available/New' : 
-                   asset.status === 'Used' ? 'Available/Used' : 
+                  {asset.status === 'New' ? 'Spare (New)' : 
+                   asset.status === 'Used' ? 'Spare (Used)' : 
                    asset.status === 'Faulty' ? 'Faulty' : 
                    asset.status === 'Disposed' ? 'Disposed' : asset.status}
                 </td>
@@ -866,8 +917,8 @@ const Assets = () => {
               <div className="col-span-2">
                 <span className="text-xs text-gray-500 block">Condition</span>
                 <span className="font-medium">
-                  {asset.status === 'New' ? 'Available/New' : 
-                   asset.status === 'Used' ? 'Available/Used' : 
+                  {asset.status === 'New' ? 'Spare (New)' : 
+                   asset.status === 'Used' ? 'Spare (Used)' : 
                    asset.status === 'Faulty' ? 'Faulty' : 
                    asset.status === 'Disposed' ? 'Disposed' : asset.status}
                 </span>
@@ -1217,16 +1268,18 @@ const Assets = () => {
                 </select>
               </div>
               <div>
-                <label className="block text-sm font-medium text-gray-700">Condition of Asset</label>
+                <label className="block text-sm font-medium text-gray-700">Status</label>
                 <select
                   name="status"
                   value={formData.status}
                   onChange={handleInputChange}
                   className="mt-1 block w-full border border-gray-300 rounded-md shadow-sm p-2"
                 >
-                  <option value="New">Available/New</option>
-                  <option value="Used">Available/Used</option>
-                  <option value="Faulty">Available Faulty</option>
+                  <option value="New">In Store (New)</option>
+                  <option value="Used">In Store (Used)</option>
+                  <option value="In Use">In Use</option>
+                  <option value="Testing">Testing</option>
+                  <option value="Faulty">Faulty</option>
                   <option value="Under Repair">Under Repair</option>
                   <option value="Disposed">Disposed</option>
                 </select>
@@ -1434,16 +1487,18 @@ const Assets = () => {
                 </select>
               </div>
               <div>
-                <label className="block text-sm font-medium text-gray-700">Condition of Asset</label>
+                <label className="block text-sm font-medium text-gray-700">Status</label>
                 <select
                   name="status"
                   value={addForm.status}
                   onChange={handleAddChange}
                   className="mt-1 block w-full border border-gray-300 rounded-md shadow-sm p-2"
                 >
-                <option value="New">Available/New</option>
-                <option value="Used">Available/Used</option>
-                <option value="Faulty">Available Faulty</option>
+                  <option value="New">In Store (New)</option>
+                  <option value="Used">In Store (Used)</option>
+                  <option value="In Use">In Use</option>
+                  <option value="Testing">Testing</option>
+                  <option value="Faulty">Faulty</option>
                   <option value="Under Repair">Under Repair</option>
                   <option value="Disposed">Disposed</option>
                 </select>

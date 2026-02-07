@@ -122,7 +122,7 @@ const Sidebar = ({ onClose, isCollapsed, toggleCollapse }) => {
   };
 
   const navItems = [
-    { name: 'Dashboard', path: '/', icon: <LayoutDashboard size={20} />, roles: ['Admin', 'Technician'] },
+    { name: 'Dashboard', path: '/', icon: <LayoutDashboard size={20} />, roles: ['Admin'] },
     {
       name: 'Events',
       icon: <Calendar size={20} />,

@@ -26,9 +26,7 @@ const seedStoresAndAdmin = async () => {
       if (!store) {
         store = await Store.create({ 
             name: data.name, 
-            isMainStore: true,
-            openingTime: '09:00', 
-            closingTime: '17:00' 
+            isMainStore: true
         });
         console.log(`Created Main Store: ${store.name}`);
       } else {

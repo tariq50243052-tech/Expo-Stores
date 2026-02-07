@@ -1,19 +1,23 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import PurchaseOrders from './PurchaseOrders';
 import api from '../api/axios';
+import ImportAssetsModal from '../components/ImportAssetsModal';
+import { Upload, Download, FileSpreadsheet, RefreshCw, Truck, Briefcase, UserCog } from 'lucide-react';
+import * as XLSX from 'xlsx';
 
 const ReceiveProcess = () => {
-  const [activeTab, setActiveTab] = useState('vendor'); // 'vendor' or 'technician'
+  const [activeTab, setActiveTab] = useState('vendor'); // 'vendor', 'contractor', 'technician'
   const [pendingReturns, setPendingReturns] = useState([]);
   const [loading, setLoading] = useState(false);
+  const [showImportModal, setShowImportModal] = useState(false);
+  const [recentActivity, setRecentActivity] = useState([]);
+  const [recentAssets, setRecentAssets] = useState([]); // Assets recently added/updated
+  const [showRecentAssets, setShowRecentAssets] = useState(false);
+  const [activityLoading, setActivityLoading] = useState(false);
+  const [assetsLoading, setAssetsLoading] = useState(false);
 
-  useEffect(() => {
-    if (activeTab === 'technician') {
-      fetchPendingReturns();
-    }
-  }, [activeTab]);
 
-  const fetchPendingReturns = async () => {
+  const fetchPendingReturns = useCallback(async () => {
     setLoading(true);
     try {
       const res = await api.get('/assets/return-pending');
@@ -23,7 +27,60 @@ const ReceiveProcess = () => {
     } finally {
       setLoading(false);
     }
-  };
+  }, []);
+
+  const fetchRecentAssets = useCallback(async () => {
+    setAssetsLoading(true);
+    try {
+      // Fetch latest assets (sorted by updatedAt desc by default)
+      const params = { limit: 50 };
+      const sourceMap = {
+        contractor: 'Contractor',
+        technician: 'Technician',
+        vendor: 'Vendor'
+      };
+      if (sourceMap[activeTab]) params.source = sourceMap[activeTab];
+      const res = await api.get('/assets', { params });
+      setRecentAssets(res.data.items || []);
+    } catch (err) {
+      console.error(err);
+    } finally {
+      setAssetsLoading(false);
+    }
+  }, [activeTab]);
+
+  const fetchRecentImports = useCallback(async () => {
+    setActivityLoading(true);
+    try {
+      const params = { limit: 20 };
+      if (activeTab === 'contractor') params.source = 'Contractor';
+      
+      const res = await api.get('/assets/recent-activity', { params });
+      // Filter for import-related activities
+      const imports = res.data.filter(log => 
+        log.action === 'Bulk Force Import' || 
+        log.action === 'Create Asset' || 
+        log.details?.toLowerCase().includes('import')
+      );
+      setRecentActivity(imports);
+    } catch (err) {
+      console.error(err);
+    } finally {
+      setActivityLoading(false);
+    }
+  }, [activeTab]);
+
+  useEffect(() => {
+    if (activeTab === 'technician') {
+      fetchPendingReturns();
+    } else if (activeTab === 'contractor') {
+      fetchRecentImports();
+    }
+
+    if (showRecentAssets) {
+      fetchRecentAssets();
+    }
+  }, [activeTab, showRecentAssets, fetchPendingReturns, fetchRecentImports, fetchRecentAssets]);
 
   const handleApproveReturn = async (assetId) => {
     try {
@@ -43,79 +100,480 @@ const ReceiveProcess = () => {
     }
   };
 
+  const exportTechnicianReturns = () => {
+    if (pendingReturns.length === 0) return;
+    
+    const data = pendingReturns.map(item => ({
+      'Asset Name': item.name,
+      'Serial Number': item.serial_number,
+      'Requested By': item.return_request?.requested_by_name || '-',
+      'Condition': item.return_request?.condition || '-',
+      'Ticket Number': item.return_request?.ticket_number || '-',
+      'Request Date': item.updatedAt ? new Date(item.updatedAt).toLocaleDateString() : '-'
+    }));
+
+    const ws = XLSX.utils.json_to_sheet(data);
+    const wb = XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(wb, ws, 'Technician Returns');
+    XLSX.writeFile(wb, `Technician_Returns_${new Date().toISOString().split('T')[0]}.xlsx`);
+  };
+
+  const exportRecentAssets = () => {
+    if (recentAssets.length === 0) return;
+
+    const data = recentAssets.map(item => ({
+      'Asset Name': item.name,
+      'Serial Number': item.serial_number,
+      'Model': item.model_number,
+      'Status': item.status,
+      'Category': item.category,
+      'Last Updated': item.updatedAt ? new Date(item.updatedAt).toLocaleString() : '-'
+    }));
+
+    const ws = XLSX.utils.json_to_sheet(data);
+    const wb = XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(wb, ws, 'Received Assets');
+    XLSX.writeFile(wb, `Received_Assets_${new Date().toISOString().split('T')[0]}.xlsx`);
+  };
+
   return (
-    <div className="p-6">
-      <h1 className="text-2xl font-bold mb-6">Receive Process</h1>
+    <div className="p-6 min-h-screen bg-gray-50">
+      <div className="flex justify-between items-center mb-8">
+        <div>
+          <h1 className="text-2xl font-bold text-gray-800">Receive Process</h1>
+          <p className="text-sm text-gray-500 mt-1">Manage incoming deliveries and returns</p>
+        </div>
+      </div>
       
-      <div className="flex gap-4 mb-6 border-b">
+      {/* Modern Tabs */}
+      <div className="bg-white p-1.5 rounded-xl border border-gray-200 inline-flex mb-8 shadow-sm">
         <button
-          className={`pb-2 px-4 font-medium ${activeTab === 'vendor' ? 'text-amber-600 border-b-2 border-amber-600' : 'text-gray-500'}`}
+          className={`flex items-center gap-2 px-5 py-2.5 rounded-lg text-sm font-medium transition-all duration-200 ${
+            activeTab === 'vendor' 
+              ? 'bg-blue-600 text-white shadow-md transform scale-105' 
+              : 'text-gray-600 hover:bg-gray-50 hover:text-gray-900'
+          }`}
           onClick={() => setActiveTab('vendor')}
         >
-          Vendor Deliveries (POs)
+          <Truck className="w-4 h-4" />
+          <span>Vendor Deliveries</span>
         </button>
         <button
-          className={`pb-2 px-4 font-medium ${activeTab === 'technician' ? 'text-amber-600 border-b-2 border-amber-600' : 'text-gray-500'}`}
+          className={`flex items-center gap-2 px-5 py-2.5 rounded-lg text-sm font-medium transition-all duration-200 ${
+            activeTab === 'contractor' 
+              ? 'bg-blue-600 text-white shadow-md transform scale-105' 
+              : 'text-gray-600 hover:bg-gray-50 hover:text-gray-900'
+          }`}
+          onClick={() => setActiveTab('contractor')}
+        >
+          <Briefcase className="w-4 h-4" />
+          <span>Contractor Deliveries</span>
+        </button>
+        <button
+          className={`flex items-center gap-2 px-5 py-2.5 rounded-lg text-sm font-medium transition-all duration-200 ${
+            activeTab === 'technician' 
+              ? 'bg-blue-600 text-white shadow-md transform scale-105' 
+              : 'text-gray-600 hover:bg-gray-50 hover:text-gray-900'
+          }`}
           onClick={() => setActiveTab('technician')}
         >
-          Technician Returns
+          <UserCog className="w-4 h-4" />
+          <span>Technician Returns</span>
         </button>
       </div>
 
-      {activeTab === 'vendor' ? (
-        <PurchaseOrders />
-      ) : (
-        <div className="bg-white p-4 rounded shadow">
-          <h2 className="text-lg font-semibold mb-3">Pending Returns from Technicians</h2>
-          {loading ? (
-            <p>Loading...</p>
-          ) : pendingReturns.length === 0 ? (
-            <p className="text-sm text-gray-500">No pending return requests</p>
-          ) : (
-            <div className="overflow-x-auto">
-              <table className="min-w-full">
-                <thead>
-                  <tr className="bg-gray-50 border-b">
-                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Asset</th>
-                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Serial</th>
-                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Requested By</th>
-                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Condition</th>
-                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Ticket</th>
-                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Action</th>
-                  </tr>
-                </thead>
-                <tbody className="bg-white divide-y divide-gray-200">
-                  {pendingReturns.map(a => (
-                    <tr key={a._id}>
-                      <td className="px-6 py-4">{a.name}</td>
-                      <td className="px-6 py-4">{a.serial_number}</td>
-                      <td className="px-6 py-4">{a.return_request?.requested_by_name || '-'}</td>
-                      <td className="px-6 py-4">{a.return_request?.condition}</td>
-                      <td className="px-6 py-4">{a.return_request?.ticket_number}</td>
-                      <td className="px-6 py-4">
-                        <div className="flex gap-3">
-                          <button
-                            onClick={() => handleApproveReturn(a._id)}
-                            className="text-green-600 hover:text-green-800"
-                          >
-                            Approve (Receive)
-                          </button>
-                          <button
-                            onClick={() => handleRejectReturn(a._id)}
-                            className="text-red-600 hover:text-red-800"
-                          >
-                            Reject
-                          </button>
-                        </div>
-                      </td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
+      <div className="bg-white rounded-xl shadow-sm border border-gray-100 min-h-[500px]">
+        {activeTab === 'vendor' && (
+          <div className="p-1">
+             {/* Recent Assets Table */}
+             {showRecentAssets && (
+             <div className="bg-white rounded-lg border border-gray-200 mb-6 mx-4 mt-4 overflow-hidden animate-in fade-in slide-in-from-top-4 duration-300">
+                <div className="flex justify-between items-center p-4 bg-gray-50 border-b border-gray-200">
+                   <h3 className="text-sm font-semibold text-gray-700 flex items-center gap-2">
+                     <Briefcase className="w-4 h-4 text-gray-500" />
+                     Recently Received / Updated Assets
+                   </h3>
+                   <button
+                     onClick={exportRecentAssets}
+                     disabled={recentAssets.length === 0}
+                     className={`flex items-center gap-2 px-3 py-1.5 rounded text-xs font-medium transition-colors border
+                       ${recentAssets.length === 0 
+                         ? 'bg-gray-100 text-gray-400 border-gray-200 cursor-not-allowed' 
+                         : 'bg-white text-gray-700 border-gray-300 hover:bg-gray-50'}`}
+                   >
+                     <Download className="w-3.5 h-3.5" />
+                     Export List
+                   </button>
+                </div>
+                
+                {assetsLoading ? (
+                   <div className="text-center py-8 text-gray-500">Loading assets...</div>
+                ) : recentAssets.length === 0 ? (
+                   <div className="text-center py-8 text-gray-500">
+                     No recent assets found.
+                   </div>
+                ) : (
+                   <div className="overflow-x-auto max-h-[400px]">
+                     <table className="min-w-full divide-y divide-gray-200">
+                       <thead className="bg-gray-50 sticky top-0 z-10">
+                         <tr>
+                           <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Asset Name</th>
+                           <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Serial</th>
+                           <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Status</th>
+                           <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Updated</th>
+                         </tr>
+                       </thead>
+                       <tbody className="bg-white divide-y divide-gray-200">
+                         {recentAssets.map((asset) => (
+                           <tr key={asset._id} className="hover:bg-gray-50">
+                             <td className="px-4 py-3 text-sm font-medium text-gray-900">{asset.name}</td>
+                             <td className="px-4 py-3 text-sm text-gray-500">{asset.serial_number}</td>
+                             <td className="px-4 py-3 text-sm">
+                               <span className={`px-2 inline-flex text-xs leading-5 font-semibold rounded-full
+                                 ${asset.status === 'Available' ? 'bg-green-100 text-green-800' : 
+                                   asset.status === 'In Use' ? 'bg-blue-100 text-blue-800' : 
+                                   'bg-gray-100 text-gray-800'}`}>
+                                 {asset.status}
+                               </span>
+                             </td>
+                             <td className="px-4 py-3 text-sm text-gray-500">
+                               {new Date(asset.updatedAt).toLocaleDateString()}
+                             </td>
+                           </tr>
+                         ))}
+                       </tbody>
+                     </table>
+                   </div>
+                )}
+             </div>
+             )}
+
+             <PurchaseOrders 
+               onImportClick={() => setShowImportModal(true)} 
+               headerActions={(
+                  <button
+                   onClick={() => setShowRecentAssets(!showRecentAssets)}
+                   className={`flex items-center gap-2 px-4 py-2 rounded flex items-center gap-2 shadow-sm transition-all border ${
+                     showRecentAssets 
+                       ? 'bg-blue-50 text-blue-700 border-blue-200' 
+                       : 'bg-white text-gray-700 border-gray-300 hover:bg-gray-50'
+                   }`}
+                  >
+                    <Briefcase className="w-4 h-4" />
+                    Recently Received
+                  </button>
+               )}
+             />
+          </div>
+        )}
+
+        {activeTab === 'contractor' && (
+          <div className="p-6">
+            <div className="flex justify-between items-center mb-6">
+              <div>
+                <h2 className="text-lg font-semibold text-gray-800">Contractor Deliveries</h2>
+                <p className="text-sm text-gray-500">Manage assets delivered by contractors</p>
+              </div>
+              <div className="flex gap-3">
+                <button
+                  onClick={() => setShowRecentAssets(!showRecentAssets)}
+                  className={`flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-medium shadow-sm transition-colors border ${
+                    showRecentAssets 
+                      ? 'bg-blue-50 text-blue-700 border-blue-200' 
+                      : 'bg-white text-gray-700 border-gray-300 hover:bg-gray-50'
+                  }`}
+                >
+                  <Briefcase className="w-4 h-4" />
+                  Recently Received Assets
+                </button>
+                <button
+                  onClick={() => setShowImportModal(true)}
+                  className="flex items-center gap-2 px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors text-sm font-medium shadow-sm"
+                >
+                  <Upload className="w-4 h-4" />
+                  Bulk Import Assets
+                </button>
+              </div>
             </div>
-          )}
-        </div>
-      )}
+
+            {/* Recently Added/Updated Assets Table */}
+            {showRecentAssets && (
+            <div className="bg-white rounded-lg border border-gray-200 mb-6 overflow-hidden animate-in fade-in slide-in-from-top-4 duration-300">
+               <div className="flex justify-between items-center p-4 bg-gray-50 border-b border-gray-200">
+                  <h3 className="text-sm font-semibold text-gray-700 flex items-center gap-2">
+                    <Briefcase className="w-4 h-4 text-gray-500" />
+                    Recently Received / Updated Assets
+                  </h3>
+                  <button
+                    onClick={exportRecentAssets}
+                    disabled={recentAssets.length === 0}
+                    className={`flex items-center gap-2 px-3 py-1.5 rounded text-xs font-medium transition-colors border
+                      ${recentAssets.length === 0 
+                        ? 'bg-gray-100 text-gray-400 border-gray-200 cursor-not-allowed' 
+                        : 'bg-white text-gray-700 border-gray-300 hover:bg-gray-50'}`}
+                  >
+                    <Download className="w-3.5 h-3.5" />
+                    Export List
+                  </button>
+               </div>
+               
+               {assetsLoading ? (
+                  <div className="text-center py-8 text-gray-500">Loading assets...</div>
+               ) : recentAssets.length === 0 ? (
+                  <div className="text-center py-8 text-gray-500">
+                    No recent assets found.
+                  </div>
+               ) : (
+                  <div className="overflow-x-auto max-h-[400px]">
+                    <table className="min-w-full divide-y divide-gray-200">
+                      <thead className="bg-gray-50 sticky top-0 z-10">
+                        <tr>
+                          <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Asset Name</th>
+                          <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Serial</th>
+                          <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Status</th>
+                          <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Updated</th>
+                        </tr>
+                      </thead>
+                      <tbody className="bg-white divide-y divide-gray-200">
+                        {recentAssets.map((asset) => (
+                          <tr key={asset._id} className="hover:bg-gray-50">
+                            <td className="px-4 py-3 text-sm font-medium text-gray-900">{asset.name}</td>
+                            <td className="px-4 py-3 text-sm text-gray-500">{asset.serial_number}</td>
+                            <td className="px-4 py-3 text-sm">
+                              <span className={`px-2 inline-flex text-xs leading-5 font-semibold rounded-full
+                                ${asset.status === 'New' ? 'bg-green-100 text-green-800' : 
+                                  asset.status === 'Used' ? 'bg-yellow-100 text-yellow-800' : 'bg-gray-100 text-gray-800'}`}>
+                                {asset.status}
+                              </span>
+                            </td>
+                            <td className="px-4 py-3 text-sm text-gray-500">
+                              {new Date(asset.updatedAt).toLocaleString()}
+                            </td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  </div>
+               )}
+            </div>
+            )}
+
+            <div className="bg-gray-50 rounded-lg border border-gray-200 p-4">
+              <h3 className="text-sm font-semibold text-gray-700 mb-4 flex items-center gap-2">
+                <RefreshCw className={`w-4 h-4 ${activityLoading ? 'animate-spin' : ''}`} />
+                Recent Import Activity
+              </h3>
+              
+              {activityLoading ? (
+                <div className="text-center py-8 text-gray-500">Loading activity...</div>
+              ) : recentActivity.length === 0 ? (
+                <div className="text-center py-8 text-gray-500 bg-white rounded border border-dashed border-gray-300">
+                  No recent import activity found.
+                </div>
+              ) : (
+                <div className="overflow-x-auto">
+                  <table className="min-w-full bg-white rounded border border-gray-200">
+                    <thead>
+                      <tr className="bg-gray-50 border-b border-gray-200">
+                        <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Date</th>
+                        <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">User</th>
+                        <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Action</th>
+                        <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Details</th>
+                      </tr>
+                    </thead>
+                    <tbody className="divide-y divide-gray-100">
+                      {recentActivity.map((log) => (
+                        <tr key={log._id} className="hover:bg-gray-50">
+                          <td className="px-4 py-3 text-sm text-gray-600">
+                            {new Date(log.createdAt).toLocaleString()}
+                          </td>
+                          <td className="px-4 py-3 text-sm text-gray-900 font-medium">{log.user}</td>
+                          <td className="px-4 py-3 text-sm text-blue-600">{log.action}</td>
+                          <td className="px-4 py-3 text-sm text-gray-600">{log.details}</td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              )}
+            </div>
+          </div>
+        )}
+
+        {activeTab === 'technician' && (
+          <div className="p-6">
+            <div className="flex justify-between items-center mb-6">
+              <div>
+                 <h2 className="text-lg font-semibold text-gray-800">Technician Returns</h2>
+                 <p className="text-sm text-gray-500">Review and approve asset returns</p>
+              </div>
+              <div className="flex gap-3">
+                 <button
+                   onClick={() => setShowRecentAssets(!showRecentAssets)}
+                   className={`flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-medium shadow-sm transition-colors border ${
+                     showRecentAssets 
+                       ? 'bg-blue-50 text-blue-700 border-blue-200' 
+                       : 'bg-white text-gray-700 border-gray-300 hover:bg-gray-50'
+                   }`}
+                 >
+                   <Briefcase className="w-4 h-4" />
+                   Recently Received
+                 </button>
+                 <button
+                   onClick={() => setShowImportModal(true)}
+                   className="flex items-center gap-2 px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors text-sm font-medium shadow-sm"
+                 >
+                   <Upload className="w-4 h-4" />
+                   Import Assets
+                 </button>
+                 <button
+                   onClick={exportTechnicianReturns}
+                   disabled={pendingReturns.length === 0}
+                   className={`flex items-center gap-2 px-4 py-2 rounded-lg transition-colors text-sm font-medium shadow-sm
+                     ${pendingReturns.length === 0 
+                       ? 'bg-gray-100 text-gray-400 cursor-not-allowed' 
+                       : 'bg-white border border-gray-300 text-gray-700 hover:bg-gray-50'}`}
+                 >
+                   <Download className="w-4 h-4" />
+                   Export Returns
+                 </button>
+              </div>
+            </div>
+
+            {/* Recent Assets Table */}
+            {showRecentAssets && (
+            <div className="bg-white rounded-lg border border-gray-200 mb-6 overflow-hidden animate-in fade-in slide-in-from-top-4 duration-300">
+               <div className="flex justify-between items-center p-4 bg-gray-50 border-b border-gray-200">
+                  <h3 className="text-sm font-semibold text-gray-700 flex items-center gap-2">
+                    <Briefcase className="w-4 h-4 text-gray-500" />
+                    Recently Received / Updated Assets
+                  </h3>
+                  <button
+                    onClick={exportRecentAssets}
+                    disabled={recentAssets.length === 0}
+                    className={`flex items-center gap-2 px-3 py-1.5 rounded text-xs font-medium transition-colors border
+                      ${recentAssets.length === 0 
+                        ? 'bg-gray-100 text-gray-400 border-gray-200 cursor-not-allowed' 
+                        : 'bg-white text-gray-700 border-gray-300 hover:bg-gray-50'}`}
+                  >
+                    <Download className="w-3.5 h-3.5" />
+                    Export List
+                  </button>
+               </div>
+               
+               {assetsLoading ? (
+                  <div className="text-center py-8 text-gray-500">Loading assets...</div>
+               ) : recentAssets.length === 0 ? (
+                  <div className="text-center py-8 text-gray-500">
+                    No recent assets found.
+                  </div>
+               ) : (
+                  <div className="overflow-x-auto max-h-[400px]">
+                    <table className="min-w-full divide-y divide-gray-200">
+                      <thead className="bg-gray-50 sticky top-0 z-10">
+                        <tr>
+                          <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Asset Name</th>
+                          <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Serial</th>
+                          <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Status</th>
+                          <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Updated</th>
+                        </tr>
+                      </thead>
+                      <tbody className="bg-white divide-y divide-gray-200">
+                        {recentAssets.map((asset) => (
+                          <tr key={asset._id} className="hover:bg-gray-50">
+                            <td className="px-4 py-3 text-sm font-medium text-gray-900">{asset.name}</td>
+                            <td className="px-4 py-3 text-sm text-gray-500">{asset.serial_number}</td>
+                            <td className="px-4 py-3 text-sm">
+                              <span className={`px-2 inline-flex text-xs leading-5 font-semibold rounded-full
+                                ${asset.status === 'Available' ? 'bg-green-100 text-green-800' : 
+                                  asset.status === 'In Use' ? 'bg-blue-100 text-blue-800' : 
+                                  'bg-gray-100 text-gray-800'}`}>
+                                {asset.status}
+                              </span>
+                            </td>
+                            <td className="px-4 py-3 text-sm text-gray-500">
+                              {new Date(asset.updatedAt).toLocaleDateString()}
+                            </td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  </div>
+               )}
+            </div>
+            )}
+
+            {loading ? (
+              <div className="text-center py-12">
+                <div className="w-8 h-8 border-4 border-blue-200 border-t-blue-600 rounded-full animate-spin mx-auto mb-2"></div>
+                <p className="text-gray-500">Loading pending returns...</p>
+              </div>
+            ) : pendingReturns.length === 0 ? (
+              <div className="text-center py-12 bg-gray-50 rounded-lg border border-dashed border-gray-300">
+                <p className="text-gray-500">No pending return requests</p>
+              </div>
+            ) : (
+              <div className="overflow-x-auto border border-gray-200 rounded-lg">
+                <table className="min-w-full divide-y divide-gray-200">
+                  <thead className="bg-gray-50">
+                    <tr>
+                      <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Asset</th>
+                      <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Serial</th>
+                      <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Requested By</th>
+                      <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Condition</th>
+                      <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Ticket</th>
+                      <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Action</th>
+                    </tr>
+                  </thead>
+                  <tbody className="bg-white divide-y divide-gray-200">
+                    {pendingReturns.map(a => (
+                      <tr key={a._id} className="hover:bg-gray-50 transition-colors">
+                        <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900">{a.name}</td>
+                        <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">{a.serial_number}</td>
+                        <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">{a.return_request?.requested_by_name || '-'}</td>
+                        <td className="px-6 py-4 whitespace-nowrap text-sm">
+                          <span className={`px-2 inline-flex text-xs leading-5 font-semibold rounded-full
+                            ${a.return_request?.condition === 'Good' ? 'bg-green-100 text-green-800' : 
+                              a.return_request?.condition === 'Faulty' ? 'bg-red-100 text-red-800' : 'bg-yellow-100 text-yellow-800'}`}>
+                            {a.return_request?.condition}
+                          </span>
+                        </td>
+                        <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">{a.return_request?.ticket_number || '-'}</td>
+                        <td className="px-6 py-4 whitespace-nowrap text-sm font-medium">
+                          <div className="flex gap-3">
+                            <button
+                              onClick={() => handleApproveReturn(a._id)}
+                              className="text-green-600 hover:text-green-900 bg-green-50 px-3 py-1 rounded border border-green-200 hover:border-green-300 transition-all"
+                            >
+                              Approve
+                            </button>
+                            <button
+                              onClick={() => handleRejectReturn(a._id)}
+                              className="text-red-600 hover:text-red-900 bg-red-50 px-3 py-1 rounded border border-red-200 hover:border-red-300 transition-all"
+                            >
+                              Reject
+                            </button>
+                          </div>
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            )}
+          </div>
+        )}
+      </div>
+
+      <ImportAssetsModal
+        isOpen={showImportModal}
+        onClose={() => setShowImportModal(false)}
+        source={activeTab === 'contractor' ? 'Contractor' : (activeTab === 'vendor' ? 'Vendor' : (activeTab === 'technician' ? 'Technician' : undefined))}
+        onSuccess={() => {
+            if (activeTab === 'contractor') fetchRecentImports();
+            if (showRecentAssets) fetchRecentAssets();
+        }}
+      />
     </div>
   );
 };

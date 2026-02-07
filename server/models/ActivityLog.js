@@ -20,6 +20,11 @@ const activityLogSchema = new mongoose.Schema({
   details: {
     type: String
   },
+  source: {
+    type: String,
+    enum: ['Vendor', 'Contractor', 'Technician', 'Initial Setup', 'Other'],
+    index: true
+  },
   store: {
     type: mongoose.Schema.Types.ObjectId,
     ref: 'Store',

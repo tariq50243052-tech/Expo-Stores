@@ -1,10 +1,11 @@
-import { PieChart, Pie, Cell, Tooltip, Legend, BarChart, Bar, XAxis, YAxis, CartesianGrid, ResponsiveContainer } from 'recharts';
+import Chart from 'react-apexcharts';
 import PropTypes from 'prop-types';
 import { 
   Box, 
   CheckCircle, 
   LayoutGrid, 
-  Trash2
+  Trash2,
+  TrendingUp
 } from 'lucide-react';
 
 const StatCard = ({ title, value, icon: Icon, color, subText }) => (
@@ -34,7 +35,7 @@ StatCard.propTypes = {
 const DashboardCharts = ({ stats }) => {
   if (!stats) return <div className="p-8 text-center text-gray-500">Loading dashboard data...</div>;
 
-  const { overview, models } = stats;
+  const { overview, models, growth } = stats;
   
   const safeOverview = overview || {
     total: 0,
@@ -46,119 +47,195 @@ const DashboardCharts = ({ stats }) => {
     pendingRequests: 0
   };
 
-  // Chart Data
-  const allocationData = [
-    { name: 'In Use', value: safeOverview.inUse, color: '#10b981' }, // Green
-    { name: 'Spare', value: safeOverview.spare, color: '#f59e0b' },  // Orange
-    { name: 'Faulty', value: safeOverview.faulty, color: '#ef4444' }, // Red
-    { name: 'Disposed', value: safeOverview.disposed, color: '#6b7280' } // Gray
-  ].filter(item => item.value > 0);
+  // ApexCharts Options for Donut
+  const donutOptions = {
+    chart: {
+      type: 'donut',
+      fontFamily: 'inherit'
+    },
+    labels: ['In Use', 'Spare', 'Faulty', 'Disposed'],
+    colors: ['#10b981', '#f59e0b', '#ef4444', '#6b7280'],
+    plotOptions: {
+      pie: {
+        donut: {
+          size: '70%',
+          labels: {
+            show: true,
+            total: {
+              show: true,
+              label: 'Total',
+              formatter: function (w) {
+                return w.globals.seriesTotals.reduce((a, b) => a + b, 0);
+              }
+            }
+          }
+        }
+      }
+    },
+    dataLabels: {
+      enabled: false
+    },
+    legend: {
+      position: 'bottom'
+    }
+  };
 
-  // If no data, show empty placeholder
-  if (allocationData.length === 0) {
-    allocationData.push({ name: 'No Data', value: 1, color: '#e5e7eb' });
-  }
+  const donutSeries = [
+    safeOverview.inUse, 
+    safeOverview.spare, 
+    safeOverview.faulty, 
+    safeOverview.disposed
+  ];
+
+  // Filter out zero values if needed, but ApexCharts handles zeros gracefully usually.
+  // Actually for donut it's better to keep indices aligned with labels.
 
   const modelData = (models || []).slice(0, 10);
+  
+  // ApexCharts Options for Bar
+  const barOptions = {
+    chart: {
+      type: 'bar',
+      toolbar: { show: false },
+      fontFamily: 'inherit'
+    },
+    plotOptions: {
+      bar: {
+        borderRadius: 4,
+        horizontal: true,
+        barHeight: '60%',
+        distributed: false
+      }
+    },
+    dataLabels: {
+      enabled: true,
+      textAnchor: 'start',
+      style: { colors: ['#fff'] },
+      formatter: function (val) {
+        return val
+      },
+      offsetX: 0,
+    },
+    colors: ['#3b82f6'],
+    xaxis: {
+      categories: modelData.map(m => m.name),
+    },
+    grid: {
+      borderColor: '#f3f4f6',
+      xaxis: { lines: { show: true } }
+    },
+    tooltip: {
+      theme: 'light',
+      y: {
+        formatter: function (val) {
+          return val
+        }
+      }
+    }
+  };
+
+  const barSeries = [{
+    name: 'Assets',
+    data: modelData.map(m => m.value)
+  }];
+
+  // Growth Chart Options
+  const growthOptions = {
+    chart: {
+      type: 'area',
+      toolbar: { show: false },
+      fontFamily: 'inherit',
+      animations: { enabled: true }
+    },
+    dataLabels: { enabled: false },
+    stroke: { curve: 'smooth', width: 2 },
+    xaxis: {
+      categories: (growth || []).map(g => g.name),
+      axisBorder: { show: false },
+      axisTicks: { show: false }
+    },
+    yaxis: { show: false },
+    grid: { show: false, padding: { left: 0, right: 0 } },
+    colors: ['#3b82f6'],
+    fill: {
+      type: 'gradient',
+      gradient: {
+        shadeIntensity: 1,
+        opacityFrom: 0.4,
+        opacityTo: 0.1,
+        stops: [0, 90, 100]
+      }
+    },
+    tooltip: {
+      y: { formatter: (val) => `${val} Assets` }
+    }
+  };
+
+  const growthSeries = [{
+    name: 'New Assets',
+    data: (growth || []).map(g => g.value)
+  }];
 
   return (
     <div className="space-y-6">
-      {/* Stats Row */}
+      {/* Stat Cards */}
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
         <StatCard 
           title="Total Assets" 
           value={safeOverview.total} 
           icon={Box} 
-          color="blue"
+          color="blue" 
+          subText="In Inventory"
         />
         <StatCard 
           title="In Use" 
           value={safeOverview.inUse} 
           icon={CheckCircle} 
-          color="emerald"
-          subText={`${((safeOverview.inUse / safeOverview.total || 0) * 100).toFixed(1)}%`}
+          color="emerald" 
+          subText={`${safeOverview.total ? Math.round((safeOverview.inUse / safeOverview.total) * 100) : 0}% Utilization`}
         />
         <StatCard 
           title="Spare" 
           value={safeOverview.spare} 
           icon={LayoutGrid} 
           color="amber" 
+          subText="Ready to assign"
         />
         <StatCard 
           title="Faulty / Disposed" 
           value={safeOverview.faulty + safeOverview.disposed} 
           icon={Trash2} 
           color="red" 
+          subText={`${safeOverview.faulty} Faulty, ${safeOverview.disposed} Disposed`}
         />
       </div>
 
-      {/* Charts Row */}
+      {/* Main Charts Row */}
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-        {/* Asset Allocation Donut */}
         <div className="bg-white p-6 rounded-xl shadow-sm border border-gray-100">
-          <h3 className="text-lg font-bold text-gray-800 mb-6">Asset Allocation</h3>
-          <div className="h-80 w-full">
-            <ResponsiveContainer width="100%" height="100%">
-              <PieChart>
-                <Pie
-                  data={allocationData}
-                  cx="50%"
-                  cy="50%"
-                  innerRadius={80}
-                  outerRadius={110}
-                  paddingAngle={5}
-                  dataKey="value"
-                >
-                  {allocationData.map((entry, index) => (
-                    <Cell key={`cell-${index}`} fill={entry.color} />
-                  ))}
-                </Pie>
-                <Tooltip 
-                  contentStyle={{ borderRadius: '8px', border: 'none', boxShadow: '0 4px 6px -1px rgba(0, 0, 0, 0.1)' }}
-                  itemStyle={{ color: '#374151', fontWeight: 600 }}
-                />
-                <Legend verticalAlign="bottom" height={36} iconType="circle" />
-              </PieChart>
-            </ResponsiveContainer>
-          </div>
+          <h3 className="text-gray-800 font-bold mb-4">Asset Allocation</h3>
+          <Chart options={donutOptions} series={donutSeries} type="donut" height={300} />
         </div>
-
-        {/* Top Models Bar Chart */}
         <div className="bg-white p-6 rounded-xl shadow-sm border border-gray-100">
-          <h3 className="text-lg font-bold text-gray-800 mb-6">Top 10 Asset Models</h3>
-          <div className="h-80 w-full">
-            <ResponsiveContainer width="100%" height="100%">
-              <BarChart 
-                data={modelData} 
-                layout="vertical" 
-                margin={{ top: 5, right: 30, left: 10, bottom: 5 }}
-              >
-                <CartesianGrid strokeDasharray="3 3" horizontal={true} vertical={false} stroke="#f3f4f6" />
-                <XAxis type="number" hide />
-                <YAxis 
-                  dataKey="name" 
-                  type="category" 
-                  width={120} 
-                  tick={{fontSize: 11, fill: '#6b7280'}} 
-                  axisLine={false} 
-                  tickLine={false} 
-                />
-                <Tooltip 
-                  cursor={{fill: '#f9fafb'}} 
-                  contentStyle={{ borderRadius: '8px', border: 'none', boxShadow: '0 4px 6px -1px rgba(0, 0, 0, 0.1)' }}
-                />
-                <Bar 
-                  dataKey="value" 
-                  fill="#3b82f6" 
-                  radius={[0, 4, 4, 0]} 
-                  barSize={20}
-                  label={{ position: 'right', fill: '#6b7280', fontSize: 12 }} 
-                />
-              </BarChart>
-            </ResponsiveContainer>
-          </div>
+          <h3 className="text-gray-800 font-bold mb-4">Top 10 Asset Models</h3>
+          <Chart options={barOptions} series={barSeries} type="bar" height={300} />
         </div>
       </div>
+
+      {/* Growth Trend Chart (Powerful Feature) */}
+      {(growth || []).length > 0 && (
+        <div className="bg-white p-6 rounded-xl shadow-sm border border-gray-100">
+          <div className="flex items-center justify-between mb-4">
+             <h3 className="text-gray-800 font-bold flex items-center gap-2">
+                <TrendingUp className="w-5 h-5 text-blue-500" />
+                Asset Acquisition Trend (Last 6 Months)
+             </h3>
+          </div>
+          <div className="h-[300px] w-full">
+            <Chart options={growthOptions} series={growthSeries} type="area" height="100%" />
+          </div>
+        </div>
+      )}
     </div>
   );
 };

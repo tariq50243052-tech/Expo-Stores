@@ -278,9 +278,7 @@ router.post('/seed', protect, superAdmin, async (req, res) => {
       if (!store) {
         store = await Store.create({ 
             name: data.name, 
-            isMainStore: true,
-            openingTime: '09:00', 
-            closingTime: '17:00' 
+            isMainStore: true
         });
         results.push(`Created: ${store.name}`);
       } else {

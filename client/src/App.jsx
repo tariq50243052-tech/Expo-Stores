@@ -2,6 +2,7 @@ import { Routes, Route, Navigate, useLocation } from 'react-router-dom';
 import { Suspense, lazy } from 'react';
 import { AuthProvider, useAuth } from './context/AuthContext';
 import Layout from './components/Layout';
+import ErrorBoundary from './components/ErrorBoundary';
 import PropTypes from 'prop-types';
 
 const Login = lazy(() => import('./pages/Login'));
@@ -76,6 +77,7 @@ ProtectedRoute.propTypes = {
 function App() {
   return (
     <AuthProvider>
+      <ErrorBoundary>
       <Suspense fallback={
         <div className="flex items-center justify-center min-h-screen bg-gray-50">
           <div className="flex flex-col items-center gap-4">
@@ -230,9 +232,22 @@ function App() {
               <Passes />
             </ProtectedRoute>
           } />
+
+          {/* 404 Fallback */}
+          <Route path="*" element={
+            <div className="flex flex-col items-center justify-center min-h-[60vh] text-center">
+              <h1 className="text-6xl font-bold text-gray-200 mb-4">404</h1>
+              <h2 className="text-2xl font-semibold text-gray-700 mb-2">Page Not Found</h2>
+              <p className="text-gray-500 mb-8">The page you are looking for does not exist or has been moved.</p>
+              <a href="/" className="bg-blue-600 text-white px-6 py-2 rounded hover:bg-blue-700 transition-colors">
+                Return to Dashboard
+              </a>
+            </div>
+          } />
         </Route>
       </Routes>
       </Suspense>
+      </ErrorBoundary>
     </AuthProvider>
   );
 }

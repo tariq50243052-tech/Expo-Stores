@@ -69,7 +69,7 @@ router.get('/', protect, async (req, res) => {
 // @route   POST /api/stores
 // @access  Private/Admin
 router.post('/', protect, admin, async (req, res) => {
-  const { name, openingTime, closingTime, isMainStore, parentStore } = req.body;
+  const { name, isMainStore, parentStore } = req.body;
   try {
     // Determine context from request
     let finalParentStore = parentStore;
@@ -95,8 +95,6 @@ router.post('/', protect, admin, async (req, res) => {
 
     const store = await Store.create({ 
       name, 
-      openingTime: openingTime || "09:00", 
-      closingTime: closingTime || "17:00",
       isMainStore: finalIsMainStore,
       parentStore: finalParentStore
     });
@@ -135,8 +133,6 @@ router.put('/:id', protect, admin, async (req, res) => {
       }
 
       store.name = req.body.name || store.name;
-      store.openingTime = req.body.openingTime || store.openingTime;
-      store.closingTime = req.body.closingTime || store.closingTime;
       
       // Only allow structure changes if Super Admin
       if (req.user.role === 'Super Admin') {

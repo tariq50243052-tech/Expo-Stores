@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
 
@@ -7,8 +7,20 @@ const Login = () => {
   const [password, setPassword] = useState('');
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);
-  const { login } = useAuth();
+  const { login, user, loading: authLoading } = useAuth();
   const navigate = useNavigate();
+
+  useEffect(() => {
+    if (!authLoading && user) {
+      if (user.role === 'Super Admin') {
+        navigate('/portal');
+      } else if (user.role === 'Technician') {
+        navigate('/scanner');
+      } else {
+        navigate('/');
+      }
+    }
+  }, [user, authLoading, navigate]);
 
   const handleSubmit = async (e) => {
     e.preventDefault();
@@ -17,14 +29,14 @@ const Login = () => {
     
     try {
       // Backend expects 'email' key but we configured it to check username too
-      const user = await login(identifier, password);
+      const loggedInUser = await login(identifier, password);
       
-      if (user.role === 'Super Admin') {
+      if (loggedInUser.role === 'Super Admin') {
         navigate('/portal');
-      } else if (user.role === 'Admin') {
-        navigate('/');
-      } else {
+      } else if (loggedInUser.role === 'Technician') {
         navigate('/scanner');
+      } else {
+        navigate('/');
       }
     } catch (err) {
       setError(err.response?.data?.message || 'Failed to login');

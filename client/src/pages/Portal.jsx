@@ -46,7 +46,11 @@ const Portal = () => {
 
   const handleSelectStore = (store) => {
     selectStore(store);
-    navigate('/');
+    // Use setTimeout to ensure state update propagates before navigation
+    // This prevents a potential redirect loop where ProtectedRoute sees the old null activeStore
+    setTimeout(() => {
+      navigate('/');
+    }, 100);
   };
 
   const handleInitializeSystem = async () => {

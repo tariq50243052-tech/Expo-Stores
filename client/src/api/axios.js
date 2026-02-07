@@ -7,8 +7,20 @@ const api = axios.create({
 // Add a request interceptor to add the token
 api.interceptors.request.use(
   (config) => {
-    const user = JSON.parse(localStorage.getItem('user'));
-    const activeStore = JSON.parse(localStorage.getItem('activeStore'));
+    let user = null;
+    let activeStore = null;
+
+    try {
+      const storedUser = localStorage.getItem('user');
+      if (storedUser) user = JSON.parse(storedUser);
+      
+      const storedActiveStore = localStorage.getItem('activeStore');
+      if (storedActiveStore) activeStore = JSON.parse(storedActiveStore);
+    } catch (e) {
+      console.error('Error parsing localStorage:', e);
+      localStorage.removeItem('user');
+      localStorage.removeItem('activeStore');
+    }
 
     if (user && user.token) {
       config.headers.Authorization = `Bearer ${user.token}`;

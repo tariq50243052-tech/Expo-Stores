@@ -3,6 +3,7 @@ const router = express.Router();
 const Request = require('../models/Request');
 const xlsx = require('xlsx');
 const { protect, admin } = require('../middleware/authMiddleware');
+const sendEmail = require('../utils/sendEmail');
 
 router.post('/', protect, async (req, res) => {
   try {
@@ -14,6 +15,29 @@ router.post('/', protect, async (req, res) => {
       requester: req.user._id,
       store
     });
+
+    // Notify admin on new request
+    try {
+      const adminRecipient = process.env.SMTP_EMAIL;
+      await sendEmail({
+        email: adminRecipient,
+        subject: `New Technician Request - ${req.user?.name || 'Unknown'}`,
+        html: `
+          <div style="font-family: system-ui, Arial, sans-serif">
+            <h2>New Request Submitted</h2>
+            <p><strong>Technician:</strong> ${req.user?.name || '-'} (${req.user?.email || '-'})</p>
+            <p><strong>Item:</strong> ${item_name}</p>
+            <p><strong>Quantity:</strong> ${quantity}</p>
+            <p><strong>Description:</strong> ${description || '-'}</p>
+            <p><strong>Store:</strong> ${store || '-'}</p>
+            <p style="color: #6b7280; font-size: 12px">Expo Stores</p>
+          </div>
+        `
+      });
+    } catch (mailErr) {
+      // Silent fail, do not block API
+    }
+
     res.status(201).json(request);
   } catch (error) {
     res.status(400).json({ message: error.message });
@@ -49,7 +73,7 @@ router.get('/', protect, admin, async (req, res) => {
 
 router.put('/:id', protect, admin, async (req, res) => {
   try {
-    const request = await Request.findById(req.params.id);
+    const request = await Request.findById(req.params.id).populate('requester', 'name email');
     if (!request) return res.status(404).json({ message: 'Request not found' });
     
     // Isolation Check
@@ -59,6 +83,28 @@ router.put('/:id', protect, admin, async (req, res) => {
 
     request.status = req.body.status || request.status;
     await request.save();
+
+    // Notify technician on status change
+    if (request.requester?.email) {
+      try {
+        await sendEmail({
+          email: request.requester.email,
+          subject: `Your Request Status Updated: ${request.status}`,
+          html: `
+            <div style="font-family: system-ui, Arial, sans-serif">
+              <h2>Request Status Updated</h2>
+              <p><strong>Item:</strong> ${request.item_name}</p>
+              <p><strong>Quantity:</strong> ${request.quantity}</p>
+              <p><strong>New Status:</strong> ${request.status}</p>
+              <p style="color: #6b7280; font-size: 12px">Expo Stores</p>
+            </div>
+          `
+        });
+      } catch (mailErr) {
+        // Silent fail
+      }
+    }
+
     res.json(request);
   } catch (error) {
     res.status(400).json({ message: error.message });

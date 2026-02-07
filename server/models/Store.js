@@ -6,16 +6,6 @@ const storeSchema = new mongoose.Schema({
     required: true,
     unique: true
   },
-  openingTime: {
-    type: String, // Format: "HH:MM" 24h
-    required: false,
-    default: "09:00"
-  },
-  closingTime: {
-    type: String, // Format: "HH:MM" 24h
-    required: false,
-    default: "17:00"
-  },
   isMainStore: {
     type: Boolean,
     default: false,
