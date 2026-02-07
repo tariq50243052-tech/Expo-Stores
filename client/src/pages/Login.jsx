@@ -18,7 +18,10 @@ const Login = () => {
     try {
       // Backend expects 'email' key but we configured it to check username too
       const user = await login(identifier, password);
-      if (user.role === 'Admin') {
+      
+      if (user.role === 'Super Admin') {
+        navigate('/portal');
+      } else if (user.role === 'Admin') {
         navigate('/');
       } else {
         navigate('/scanner');
