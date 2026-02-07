@@ -76,6 +76,10 @@ try {
     });
   } else {
     console.log('Client dist folder not found at:', clientDist);
+    // Fallback route if client is not built
+    app.get('/', (req, res) => {
+      res.status(200).send('API is running successfully. <br/>Note: Frontend client is not served because the build folder was not found. Check your deployment build logs.');
+    });
   }
 } catch (error) {
   console.error('Error setting up static files:', error);
