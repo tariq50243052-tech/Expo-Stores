@@ -58,7 +58,35 @@ const seedStoresAndUsers = async () => {
       console.log('Super Admin already exists');
     }
 
-    console.log('Seeding Stores and Super Admin completed.');
+    // 3. Create Default Store Admins
+    const defaultAdmins = [
+      { name: 'SCY Admin', email: 'scy@expo.com', storeName: 'SCY ASSET' },
+      { name: 'IT Admin', email: 'it@expo.com', storeName: 'IT ASSET' },
+      { name: 'NOC Admin', email: 'noc@expo.com', storeName: 'NOC ASSET' }
+    ];
+
+    for (const adminData of defaultAdmins) {
+      const adminExists = await User.findOne({ email: adminData.email });
+      if (!adminExists) {
+        const store = storeMap[adminData.storeName];
+        if (store) {
+          const salt = await bcrypt.genSalt(10);
+          const hashedPassword = await bcrypt.hash('admin123', salt);
+          await User.create({
+            name: adminData.name,
+            email: adminData.email,
+            password: hashedPassword,
+            role: 'Admin',
+            assignedStore: store._id
+          });
+          console.log(`Created ${adminData.name}: ${adminData.email} / admin123`);
+        }
+      } else {
+         console.log(`Admin exists: ${adminData.email}`);
+      }
+    }
+
+    console.log('Seeding Stores, Super Admin, and Default Admins completed.');
 
   } catch (error) {
     console.error('Seeding error:', error);
