@@ -177,6 +177,20 @@ const seedAdmin = async () => {
   }
 };
 
+// 404 Handler (Last Route)
+app.use((req, res) => {
+  res.status(404).send(`
+    <h1>404 Not Found</h1>
+    <p>The requested URL <code>${req.url}</code> was not found on this server.</p>
+    <p><strong>Diagnostics:</strong></p>
+    <ul>
+      <li>Client Build Path: ${path.resolve(__dirname, '../client/dist')}</li>
+      <li>Client Build Exists: ${require('fs').existsSync(path.resolve(__dirname, '../client/dist')) ? 'Yes' : 'No'}</li>
+      <li>Node Env: ${process.env.NODE_ENV}</li>
+    </ul>
+  `);
+});
+
 const PORT = process.env.PORT || 5000;
 
 app.listen(PORT, () => console.log(`Server running on port ${PORT}`));
