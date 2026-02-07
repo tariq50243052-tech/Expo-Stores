@@ -78,7 +78,12 @@ try {
     console.log('Client dist folder not found at:', clientDist);
     // Fallback route if client is not built
     app.get('/', (req, res) => {
-      res.status(200).send('API is running successfully. <br/>Note: Frontend client is not served because the build folder was not found. Check your deployment build logs.');
+      res.status(200).send(`
+        <h1>API is running successfully</h1>
+        <p><strong>Note:</strong> Frontend client is not served because the build folder was not found.</p>
+        <p>Please check your deployment build logs.</p>
+        <p>Debug info available at <a href="/debug-fs">/debug-fs</a></p>
+      `);
     });
   }
 } catch (error) {
@@ -179,16 +184,39 @@ const seedAdmin = async () => {
 
 // 404 Handler (Last Route)
 app.use((req, res) => {
-  res.status(404).send(`
-    <h1>404 Not Found</h1>
-    <p>The requested URL <code>${req.url}</code> was not found on this server.</p>
-    <p><strong>Diagnostics:</strong></p>
-    <ul>
-      <li>Client Build Path: ${path.resolve(__dirname, '../client/dist')}</li>
-      <li>Client Build Exists: ${require('fs').existsSync(path.resolve(__dirname, '../client/dist')) ? 'Yes' : 'No'}</li>
-      <li>Node Env: ${process.env.NODE_ENV}</li>
-    </ul>
-  `);
+  res.status(404).send('Not Found');
+});
+
+// Debug Route to check File System (Temporary)
+app.get('/debug-fs', (req, res) => {
+  const fs = require('fs');
+  const debugInfo = {
+    cwd: process.cwd(),
+    __dirname: __dirname,
+    clientDistPath: clientDist,
+    clientDistExists: fs.existsSync(clientDist),
+    rootDirContents: [],
+    clientDirContents: [],
+    distDirContents: []
+  };
+
+  try {
+    const rootDir = path.resolve(__dirname, '..');
+    debugInfo.rootDirContents = fs.readdirSync(rootDir);
+    
+    const clientDir = path.resolve(rootDir, 'client');
+    if (fs.existsSync(clientDir)) {
+      debugInfo.clientDirContents = fs.readdirSync(clientDir);
+    }
+    
+    if (fs.existsSync(clientDist)) {
+      debugInfo.distDirContents = fs.readdirSync(clientDist);
+    }
+  } catch (error) {
+    debugInfo.error = error.message;
+  }
+
+  res.json(debugInfo);
 });
 
 const PORT = process.env.PORT || 5000;
