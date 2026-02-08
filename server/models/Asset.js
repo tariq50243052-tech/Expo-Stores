@@ -108,6 +108,18 @@ const assetSchema = new mongoose.Schema({
     requested_by: { type: mongoose.Schema.Types.ObjectId, ref: 'User' },
     ticket_number: String,
     notes: String
+  },
+  history: {
+    type: [
+      {
+        action: String,
+        ticket_number: String,
+        details: String,
+        user: String,
+        date: { type: Date, default: Date.now }
+      }
+    ],
+    default: []
   }
 }, { timestamps: true });
 
