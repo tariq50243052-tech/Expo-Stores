@@ -1,0 +1,48 @@
+name: Deploy to Linux Host
+
+on:
+  push:
+    branches: [ "main" ]
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Deploy via SSH
+        uses: appleboy/ssh-action@v0.1.7
+        with:
+          host: ${{ secrets.SSH_HOST }}
+          username: ${{ secrets.SSH_USER }}
+          key: ${{ secrets.SSH_KEY }}
+          port: ${{ secrets.SSH_PORT || 22 }}
+          script_stop: true
+          envs: APP_DIR,REPO_URL
+          script: |
+            set -e
+            APP_DIR="${APP_DIR:-/opt/expo-stores}"
+            REPO_URL="${REPO_URL:-https://github.com/tariq50243052-tech/Expo-Stores.git}"
+
+            echo "Deploying to $APP_DIR"
+            if [ ! -d "$APP_DIR/.git" ]; then
+              sudo mkdir -p "$APP_DIR"
+              sudo chown "$USER":"$USER" "$APP_DIR"
+              git clone "$REPO_URL" "$APP_DIR"
+            fi
+
+            cd "$APP_DIR"
+            git fetch --all
+            git reset --hard origin/main
+
+            npm run install:all
+            npm run build:prod
+
+            # Restart service if present
+            if command -v systemctl >/dev/null 2>&1; then
+              sudo systemctl restart expo-stores || true
+              sudo systemctl enable expo-stores || true
+            fi
+
+            echo "Deployment completed."
